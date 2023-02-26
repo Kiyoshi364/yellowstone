@@ -13,8 +13,8 @@ pub const simulation = lib_sim.Sandboxed(State, Input, Render){
     .render = render,
 };
 
-const width = 8;
-const height = width / 2;
+pub const width = 8;
+pub const height = width / 2;
 pub const State = struct {
     block_grid: [height][width]Block,
     power_grid: [height][width]Power,
@@ -78,65 +78,54 @@ pub fn update(
             .putBlock => |i| {
                 newstate.block_grid[i.y][i.x] = i.block;
                 newstate.power_grid[i.y][i.x] = .{};
+                for (directions) |d| {
+                    if (d.inbounds(i.y, i.x, height, width)) |npos| {
+                        try mod_stack.append(npos);
+                    }
+                }
+                try mod_stack.append([_]usize{ i.y, i.x });
             },
         }
     }
 
-    { // handle sources
-        for (newstate.block_grid, 0..) |row, y| {
-            for (row, 0..) |b, x| {
-                switch (b) {
-                    .empty => {},
-                    .source => {
-                        for (directions) |d| {
-                            if (d.inbounds(y, x, height, width)) |pos| {
-                                const ny = pos[0];
-                                const nx = pos[1];
-                                const b2 = newstate.block_grid[ny][nx];
-                                if (b2 == .wire) {
-                                    try mod_stack.append(pos);
-                                    newstate.power_grid[ny][nx] =
-                                        .{ .power = 15 };
-                                }
-                            }
-                        }
-                    },
-                    .wire => {},
-                    .block => {},
-                }
-            }
-        }
-    }
-
-    { // update marked
+    { // update marked power
         // Note: a block may be marked many times
         // leading to unnecessary updates
         while (mod_stack.popOrNull()) |pos| {
-            const b = newstate.block_grid[pos[0]][pos[1]];
             const y = pos[0];
             const x = pos[1];
-            switch (b) {
-                .empty => {},
-                .source => {},
-                .wire => {
-                    const this_power =
-                        newstate.power_grid[y][x].power;
-                    for (directions) |d| {
-                        if (d.inbounds(y, x, height, width)) |npos| {
-                            const ny = npos[0];
-                            const nx = npos[1];
-                            const b2 = newstate.block_grid[ny][nx];
-                            const that_power =
-                                newstate.power_grid[ny][nx].power;
-                            if (b2 == .wire and that_power < this_power) {
-                                try mod_stack.append(npos);
-                                newstate.power_grid[ny][nx] =
-                                    .{ .power = this_power - 1 };
-                            }
-                        }
-                    }
+            const b = newstate.block_grid[y][x];
+            var this_power = switch (b) {
+                .empty => continue,
+                .source => {
+                    newstate.power_grid[y][x].power = 16;
+                    continue;
                 },
-                .block => {},
+                else => @as(u5, 0),
+            };
+            for (directions) |d| {
+                if (d.inbounds(y, x, height, width)) |npos| {
+                    const ny = npos[0];
+                    const nx = npos[1];
+                    const that_power =
+                        newstate.power_grid[ny][nx].power;
+                    if (this_power < that_power) {
+                        this_power = that_power - 1;
+                    }
+                }
+            }
+            this_power = switch (b) {
+                .empty, .source => unreachable,
+                .wire => this_power,
+                .block => @min(1, this_power),
+            };
+            if (this_power != newstate.power_grid[y][x].power) {
+                newstate.power_grid[y][x].power = this_power;
+                for (directions) |d| {
+                    if (d.inbounds(y, x, height, width)) |npos| {
+                        try mod_stack.append(npos);
+                    }
+                }
             }
         }
     }
@@ -151,7 +140,7 @@ pub fn render(
         try alloc.create([height][width]DrawBlock);
     for (state.block_grid, 0..) |row, y| {
         for (row, 0..) |b, x| {
-            const powers = @as(*const [16]u8, " 123456789abcdef");
+            const powers = @as(*const [17]u8, " 123456789abcdef*");
             const c = powers[state.power_grid[y][x].power];
             const b_char = switch (b) {
                 .empty => @as(u8, ' '),

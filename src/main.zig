@@ -48,11 +48,9 @@ pub fn main() !void {
     const simulation = sim.simulation;
 
     var state = sim.emptyState;
-    state.block_grid[1][3] = .{ .wire = .{} };
-    state.block_grid[1][4] = .{ .wire = .{} };
-    state.block_grid[1][5] = .{ .wire = .{} };
-    state.block_grid[2][2] = .{ .wire = .{} };
-    state.block_grid[2][4] = .{ .wire = .{} };
+    state.block_grid[0] = .{.{ .wire = .{} }} ** sim.width;
+    state.block_grid[2] = .{.{ .wire = .{} }} ** sim.width;
+    state.block_grid[1][7] = .{ .wire = .{} };
     state.block_grid[3][2] = .{ .wire = .{} };
     state.block_grid[3][3] = .{ .wire = .{} };
     state.block_grid[3][4] = .{ .wire = .{} };
@@ -60,8 +58,8 @@ pub fn main() !void {
     const inputs = [_]sim.Input{
         .empty,
         .{ .putBlock = .{
-            .y = 1,
-            .x = 2,
+            .y = 0,
+            .x = 0,
             .block = .{ .source = .{} },
         } },
         .{ .putBlock = .{
