@@ -10,6 +10,10 @@ fn draw(render: sim.Render) !void {
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
 
+    try stdout.print("=", .{});
+    for (render[0]) |_| {
+        try stdout.print("====", .{});
+    } else try stdout.print("\n", .{});
     try stdout.print("+", .{});
     for (render[0]) |_| {
         try stdout.print("---+", .{});
@@ -44,11 +48,35 @@ pub fn main() !void {
     const simulation = sim.simulation;
 
     var state = sim.emptyState;
-    state[3][4] = .{ .wire = .{ .power = 0 } };
+    state.block_grid[1][3] = .{ .wire = .{} };
+    state.block_grid[1][4] = .{ .wire = .{} };
+    state.block_grid[1][5] = .{ .wire = .{} };
+    state.block_grid[2][2] = .{ .wire = .{} };
+    state.block_grid[2][4] = .{ .wire = .{} };
+    state.block_grid[3][2] = .{ .wire = .{} };
+    state.block_grid[3][3] = .{ .wire = .{} };
+    state.block_grid[3][4] = .{ .wire = .{} };
 
-    var i = @as(u8, 0);
-    while (i < 1) : (i += 1) {
-        const input = void{};
+    const inputs = [_]sim.Input{
+        .empty,
+        .{ .putBlock = .{
+            .y = 1,
+            .x = 2,
+            .block = .{ .source = .{} },
+        } },
+        .{ .putBlock = .{
+            .y = 2,
+            .x = 4,
+            .block = .{ .block = .{} },
+        } },
+        .{ .putBlock = .{
+            .y = 3,
+            .x = 5,
+            .block = .{ .wire = .{} },
+        } },
+    };
+
+    for (inputs) |input| {
         state = try simulation.step(state, input, alloc);
         const render = try simulation.view(state, alloc);
         try draw(render);

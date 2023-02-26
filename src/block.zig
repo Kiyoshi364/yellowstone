@@ -8,6 +8,6 @@ pub const BlockType = enum(u4) {
 pub const Block = union(BlockType) {
     empty: struct {},
     source: struct {},
-    wire: struct { power: u4 = 0 },
+    wire: struct {},
     block: struct {},
 };
