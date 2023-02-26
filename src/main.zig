@@ -17,11 +17,6 @@ test "lib_sim.counter" {
     const counter = lib_sim.examples.counter_example;
     const model = @as(counter.Model, 1);
     const input = .Dec;
-    var fa = std.testing.FailingAllocator.init(
-        std.testing.allocator,
-        0,
-    );
-    const alloc = fa.allocator();
-    const new_model = counter.sim.step(model, input, alloc);
+    const new_model = counter.sim.step(model, input);
     try std.testing.expectEqual(@as(counter.Model, 0), new_model);
 }
