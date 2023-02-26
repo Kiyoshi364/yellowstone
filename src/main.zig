@@ -2,15 +2,65 @@ const std = @import("std");
 
 const lib_sim = @import("lib_sim");
 
-pub fn main() !void {
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
+const block = @import("block.zig");
+const sim = @import("simulation.zig");
+
+fn draw(render: sim.Render) !void {
+    const stdout_file = std.io.getStdOut().writer();
+    var bw = std.io.bufferedWriter(stdout_file);
+    const stdout = bw.writer();
+
+    try stdout.print("+", .{});
+    for (render[0]) |_| {
+        try stdout.print("---+", .{});
+    } else try stdout.print("\n", .{});
+    for (render) |row| {
+        try stdout.print("|", .{});
+        for (row) |x| {
+            try stdout.print("{s: ^3}|", .{x.up_row});
+        } else try stdout.print("\n", .{});
+        try stdout.print("|", .{});
+        for (row) |x| {
+            try stdout.print("{s: ^3}|", .{x.mid_row});
+        } else try stdout.print("\n", .{});
+        try stdout.print("|", .{});
+        for (row) |x| {
+            try stdout.print("{s: ^3}|", .{x.bot_row});
+        } else try stdout.print("\n", .{});
+        try stdout.print("+", .{});
+        for (row) |_| {
+            try stdout.print("---+", .{});
+        } else try stdout.print("\n", .{});
+    }
+    try bw.flush();
 }
 
-test "simple test" {
-    var list = std.ArrayList(i32).init(std.testing.allocator);
-    defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-    try list.append(42);
-    try std.testing.expectEqual(@as(i32, 42), list.pop());
+pub fn main() !void {
+    var arena =
+        std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const alloc = arena.allocator();
+
+    const simulation = sim.simulation;
+
+    var model = sim.emptyModel;
+    model[3][4] = .{ .wire = .{ .power = 0 } };
+
+    var i = @as(u8, 0);
+    while (i < 1) : (i += 1) {
+        const input = void{};
+        model = try simulation.step(model, input, alloc);
+        const render = try simulation.view(model, alloc);
+        try draw(render);
+
+        std.debug.assert(arena.reset(.{ .free_all = {} }));
+    }
+}
+
+test "It compiles!" {
+    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDeclsRecursive(block);
+    std.testing.refAllDeclsRecursive(sim);
 }
 
 test "lib_sim.counter" {
