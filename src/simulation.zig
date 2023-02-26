@@ -32,34 +32,8 @@ pub const emptyState = @as(State, .{
     .power_grid = .{.{.{}} ** width} ** height,
 });
 
-const Direction = struct {
-    y: i2 = 0,
-    x: i2 = 0,
-
-    fn inbounds(
-        self: Direction,
-        y: usize,
-        x: usize,
-        h: usize,
-        w: usize,
-    ) ?[2]usize {
-        const iy = @intCast(isize, y) + self.y;
-        const ix = @intCast(isize, x) + self.x;
-        const y_is_ofb = iy < 0 or h <= iy;
-        const x_is_ofb = ix < 0 or w <= ix;
-        return if (y_is_ofb or x_is_ofb) null else [_]usize{
-            @intCast(usize, iy),
-            @intCast(usize, ix),
-        };
-    }
-};
-
-const directions = [_]Direction{
-    .{ .x = 1 },
-    .{ .x = -1 },
-    .{ .y = 1 },
-    .{ .y = -1 },
-};
+const Direction = @import("Direction.zig");
+const directions = Direction.directions;
 
 pub fn update(
     state: State,
@@ -79,7 +53,7 @@ pub fn update(
                 newstate.block_grid[i.y][i.x] = i.block;
                 newstate.power_grid[i.y][i.x] = .{};
                 for (directions) |d| {
-                    if (d.inbounds(i.y, i.x, height, width)) |npos| {
+                    if (d.inbounds(usize, i.y, i.x, height, width)) |npos| {
                         try mod_stack.append(npos);
                     }
                 }
@@ -110,7 +84,7 @@ pub fn update(
                 else => @as(u5, 0),
             };
             for (directions) |d| {
-                if (d.inbounds(y, x, height, width)) |npos| {
+                if (d.inbounds(usize, y, x, height, width)) |npos| {
                     const ny = npos[0];
                     const nx = npos[1];
                     const that_power =
@@ -128,7 +102,7 @@ pub fn update(
             if (this_power != newstate.power_grid[y][x].power) {
                 newstate.power_grid[y][x].power = this_power;
                 for (directions) |d| {
-                    if (d.inbounds(y, x, height, width)) |npos| {
+                    if (d.inbounds(usize, y, x, height, width)) |npos| {
                         try mod_stack.append(npos);
                     }
                 }
