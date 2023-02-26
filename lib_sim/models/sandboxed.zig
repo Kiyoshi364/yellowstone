@@ -5,12 +5,10 @@ pub fn Sandboxed(
     comptime State: type,
     comptime Input: type,
     comptime Render: type,
-    comptime UpdateError: type,
-    comptime RenderError: type,
 ) type {
     return struct {
-        update: fn (State, Input, Allocator) UpdateError!State,
-        render: fn (State, Allocator) RenderError!Render,
+        update: fn (State, Input, Allocator) Allocator.Error!State,
+        render: fn (State, Allocator) Allocator.Error!Render,
 
         const Self = @This();
 
@@ -19,7 +17,7 @@ pub fn Sandboxed(
             state: State,
             input: Input,
             alloc: Allocator,
-        ) UpdateError!State {
+        ) Allocator.Error!State {
             return self.update(state, input, alloc);
         }
 
@@ -28,7 +26,7 @@ pub fn Sandboxed(
             state: State,
             inputs: []const Input,
             alloc: Allocator,
-        ) UpdateError!State {
+        ) Allocator.Error!State {
             var curr_state = state;
             return for (inputs) |input| {
                 curr_state = try self.step(curr_state, input, alloc);
@@ -39,7 +37,7 @@ pub fn Sandboxed(
             comptime self: Self,
             state: State,
             alloc: Allocator,
-        ) RenderError!Render {
+        ) Allocator.Error!Render {
             return self.render(state, alloc);
         }
     };
