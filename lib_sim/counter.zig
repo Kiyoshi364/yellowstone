@@ -3,15 +3,15 @@ const Allocator = std.mem.Allocator;
 
 const Simulation = @import("simulation.zig");
 
-pub const Model = usize;
+pub const State = usize;
 pub const Input = enum {
     Inc,
     Dec,
 };
-pub const Render = Model;
+pub const Render = State;
 
 pub const sim = Simulation.SandboxedNoAlloc(
-    Model,
+    State,
     Input,
     Render,
 ){
@@ -19,17 +19,17 @@ pub const sim = Simulation.SandboxedNoAlloc(
     .render = render,
 };
 
-pub const init = @as(Model, 0);
+pub const init = @as(State, 0);
 
-pub fn update(model: Model, input: Input) Model {
+pub fn update(state: State, input: Input) State {
     return switch (input) {
-        .Inc => model +| 1,
-        .Dec => model -| 1,
+        .Inc => state +| 1,
+        .Dec => state -| 1,
     };
 }
 
-pub fn render(model: Model) Render {
-    return model;
+pub fn render(state: State) Render {
+    return state;
 }
 
 test "sizeof simulation is 0" {
@@ -40,31 +40,31 @@ test "sizeof simulation is 0" {
 }
 
 test "step .Inc" {
-    const model = @as(Model, 0);
+    const state = @as(State, 0);
     const input = .Inc;
-    const new_model = sim.step(model, input);
-    try std.testing.expectEqual(@as(Model, 1), new_model);
+    const new_state = sim.step(state, input);
+    try std.testing.expectEqual(@as(State, 1), new_state);
 }
 
 test "step .Dec" {
-    const model = @as(Model, 1);
+    const state = @as(State, 1);
     const input = .Dec;
-    const new_model = sim.step(model, input);
-    try std.testing.expectEqual(@as(Model, 0), new_model);
+    const new_state = sim.step(state, input);
+    try std.testing.expectEqual(@as(State, 0), new_state);
 }
 
 test "run" {
-    const model = @as(Model, 0);
+    const state = @as(State, 0);
     const inputs = &[_]Input{
         .Inc, .Inc, .Inc, .Dec, .Inc, .Dec,
     };
-    const new_model = sim.run(model, inputs);
-    try std.testing.expectEqual(@as(Model, 2), new_model);
+    const new_state = sim.run(state, inputs);
+    try std.testing.expectEqual(@as(State, 2), new_state);
 }
 
 test "view" {
-    const model = @as(Model, 0);
-    const view = sim.view(model);
-    // Note: in this simulation ( Model == Render )
-    try std.testing.expectEqual(model, view);
+    const state = @as(State, 0);
+    const view = sim.view(state);
+    // Note: in this simulation ( State == Render )
+    try std.testing.expectEqual(state, view);
 }

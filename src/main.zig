@@ -43,14 +43,14 @@ pub fn main() !void {
 
     const simulation = sim.simulation;
 
-    var model = sim.emptyModel;
-    model[3][4] = .{ .wire = .{ .power = 0 } };
+    var state = sim.emptyState;
+    state[3][4] = .{ .wire = .{ .power = 0 } };
 
     var i = @as(u8, 0);
     while (i < 1) : (i += 1) {
         const input = void{};
-        model = try simulation.step(model, input, alloc);
-        const render = try simulation.view(model, alloc);
+        state = try simulation.step(state, input, alloc);
+        const render = try simulation.view(state, alloc);
         try draw(render);
 
         std.debug.assert(arena.reset(.{ .free_all = {} }));
@@ -65,8 +65,8 @@ test "It compiles!" {
 
 test "lib_sim.counter" {
     const counter = lib_sim.examples.counter_example;
-    const model = @as(counter.Model, 1);
+    const state = @as(counter.State, 1);
     const input = .Dec;
-    const new_model = counter.sim.step(model, input);
-    try std.testing.expectEqual(@as(counter.Model, 0), new_model);
+    const new_state = counter.sim.step(state, input);
+    try std.testing.expectEqual(@as(counter.State, 0), new_state);
 }

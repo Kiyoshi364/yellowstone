@@ -5,7 +5,7 @@ const lib_sim = @import("lib_sim");
 const block = @import("block.zig");
 
 pub const simulation = lib_sim.Sandboxed(
-    Model,
+    State,
     Input,
     Render,
     UpdateError,
@@ -17,24 +17,24 @@ pub const simulation = lib_sim.Sandboxed(
 
 const width = 8;
 const height = width / 2;
-pub const Model = [height][width]block.Block;
+pub const State = [height][width]block.Block;
 pub const Input = void;
 pub const Render = *const [height][width]DrawBlock;
 pub const UpdateError = error{};
 pub const RenderError = error{OutOfMemory};
 
-pub const emptyModel = @as(Model, .{
+pub const emptyState = @as(State, .{
     .{.{ .empty = .{} }} ** width,
 } ** height);
 
-pub fn update(model: Model, _: Input, _: Allocator) UpdateError!Model {
-    return model;
+pub fn update(state: State, _: Input, _: Allocator) UpdateError!State {
+    return state;
 }
 
-pub fn render(model: Model, alloc: Allocator) RenderError!Render {
+pub fn render(state: State, alloc: Allocator) RenderError!Render {
     const canvas: *[height][width]DrawBlock =
         try alloc.create([height][width]DrawBlock);
-    for (model, 0..) |row, y| {
+    for (state, 0..) |row, y| {
         for (row, 0..) |b, x| {
             canvas.*[y][x] = switch (b) {
                 .empty => DrawBlock{

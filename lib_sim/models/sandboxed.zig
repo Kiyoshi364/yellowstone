@@ -2,45 +2,45 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 pub fn Sandboxed(
-    comptime Model: type,
+    comptime State: type,
     comptime Input: type,
     comptime Render: type,
     comptime UpdateError: type,
     comptime RenderError: type,
 ) type {
     return struct {
-        update: fn (Model, Input, Allocator) UpdateError!Model,
-        render: fn (Model, Allocator) RenderError!Render,
+        update: fn (State, Input, Allocator) UpdateError!State,
+        render: fn (State, Allocator) RenderError!Render,
 
         const Self = @This();
 
         pub fn step(
             comptime self: Self,
-            model: Model,
+            state: State,
             input: Input,
             alloc: Allocator,
-        ) UpdateError!Model {
-            return self.update(model, input, alloc);
+        ) UpdateError!State {
+            return self.update(state, input, alloc);
         }
 
         pub fn run(
             comptime self: Self,
-            model: Model,
+            state: State,
             inputs: []const Input,
             alloc: Allocator,
-        ) UpdateError!Model {
-            var curr_model = model;
+        ) UpdateError!State {
+            var curr_state = state;
             return for (inputs) |input| {
-                curr_model = try self.step(curr_model, input, alloc);
-            } else curr_model;
+                curr_state = try self.step(curr_state, input, alloc);
+            } else curr_state;
         }
 
         pub fn view(
             comptime self: Self,
-            model: Model,
+            state: State,
             alloc: Allocator,
         ) RenderError!Render {
-            return self.render(model, alloc);
+            return self.render(state, alloc);
         }
     };
 }

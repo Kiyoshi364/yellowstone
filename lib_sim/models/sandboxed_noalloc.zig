@@ -1,38 +1,38 @@
 pub fn SandboxedNoAlloc(
-    comptime Model: type,
+    comptime State: type,
     comptime Input: type,
     comptime Render: type,
 ) type {
     return struct {
-        update: fn (Model, Input) Model,
-        render: fn (Model) Render,
+        update: fn (State, Input) State,
+        render: fn (State) Render,
 
         const Self = @This();
 
         pub fn step(
             comptime self: Self,
-            model: Model,
+            state: State,
             input: Input,
-        ) Model {
-            return self.update(model, input);
+        ) State {
+            return self.update(state, input);
         }
 
         pub fn run(
             comptime self: Self,
-            model: Model,
+            state: State,
             inputs: []const Input,
-        ) Model {
-            var curr_model = model;
+        ) State {
+            var curr_state = state;
             return for (inputs) |input| {
-                curr_model = self.step(curr_model, input);
-            } else curr_model;
+                curr_state = self.step(curr_state, input);
+            } else curr_state;
         }
 
         pub fn view(
             comptime self: Self,
-            model: Model,
+            state: State,
         ) Render {
-            return self.render(model);
+            return self.render(state);
         }
     };
 }
