@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const simulation = @import("simulation");
+const lib_sim = @import("lib_sim");
 
 pub fn main() !void {
     std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
@@ -13,8 +13,8 @@ test "simple test" {
     try std.testing.expectEqual(@as(i32, 42), list.pop());
 }
 
-test "simulation" {
-    const counter = simulation.examples.counter_example;
+test "lib_sim.counter" {
+    const counter = lib_sim.examples.counter_example;
     const model = @as(counter.Model, 1);
     const input = .Dec;
     var fa = std.testing.FailingAllocator.init(

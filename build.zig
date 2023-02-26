@@ -23,7 +23,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    exe.addModule("simulation", sim_module);
+    exe.addModule("lib_sim", sim_module);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -41,21 +41,21 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     // Creates a step for unit testing.
-    const exe_tests_sim_example_counter = b.addTest(.{
-        .root_source_file = .{ .path = "lib_sim/counter.zig" },
+    const exe_tests_lib_sim = b.addTest(.{
+        .root_source_file = .{ .path = "lib_sim/simulation.zig" },
         .target = target,
         .optimize = optimize,
     });
 
     const test_lib_sim_step = b.step("test_lib_sim", "Run unit tests for lib_sim");
-    test_lib_sim_step.dependOn(&exe_tests_sim_example_counter.step);
+    test_lib_sim_step.dependOn(&exe_tests_lib_sim.step);
 
     const exe_tests_main = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
-    exe_tests_main.addModule("simulation", sim_module);
+    exe_tests_main.addModule("lib_sim", sim_module);
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&exe_tests_main.step);
