@@ -2,8 +2,8 @@ const std = @import("std");
 
 const lib_sim = @import("lib_sim");
 
-const block = @import("block.zig");
-const sim = @import("simulation.zig");
+pub const block = @import("block.zig");
+pub const sim = @import("simulation.zig");
 
 pub fn main() !void {
     var arena =

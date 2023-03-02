@@ -40,6 +40,18 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
+    // Creates a step for docs.
+    const main_docs = b.addTest(.{
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    main_docs.addModule("lib_sim", sim_module);
+    main_docs.emit_docs = .emit;
+
+    const docs_step = b.step("docs", "Build docs");
+    docs_step.dependOn(&main_docs.step);
+
     // Creates a step for unit testing.
     const exe_tests_lib_sim = b.addTest(.{
         .root_source_file = .{ .path = "lib_sim/simulation.zig" },
