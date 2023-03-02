@@ -14,12 +14,12 @@ pub const LEFT = Direction{ .x = -1 };
 pub const RIGHT = Direction{ .x = 1 };
 
 pub const DirectionEnum = enum(u3) {
-    // Above,
-    Up,
-    Right,
-    Down,
-    Left,
-    // Below,
+    // Above = 0,
+    Up = 1,
+    Right = 2,
+    Down = 3,
+    Left = 4,
+    // Below = 5,
 
     pub const count = 4; // 6;
 

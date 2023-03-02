@@ -33,6 +33,7 @@ pub const emptyState = @as(State, .{
 });
 
 const Direction = @import("Direction.zig");
+const DirectionEnum = Direction.DirectionEnum;
 const directions = Direction.directions;
 
 pub fn update(
@@ -143,19 +144,35 @@ pub fn render(
         try alloc.create([height][width]DrawBlock);
     for (state.block_grid, 0..) |row, y| {
         for (row, 0..) |b, x| {
-            const powers = @as(*const [17]u8, " 123456789abcdef*");
+            const char_powers = @as(*const [17]u8, " 123456789abcdef*");
             const power_index = state.power_grid[y][x].to_index();
-            const c = powers[power_index];
-            const b_char = switch (b) {
+            const c_power = char_powers[power_index];
+            const c_block = switch (b) {
                 .empty => @as(u8, ' '),
                 .source => @as(u8, 'S'),
                 .wire => @as(u8, 'w'),
                 .block => @as(u8, 'B'),
             };
+            const char_dirs = @as(*const [6]u8, "o^>v<x");
+            var c_dirs = @as([6]u8, "      ".*);
+            if (b.facing()) |facing| {
+                const i = @enumToInt(facing);
+                c_dirs[i] = char_dirs[i];
+            } else {
+                // Empty
+            }
+            // const above = @enumToInt(DirectionEnum.Above);
+            const up = @enumToInt(DirectionEnum.Up);
+            const right = @enumToInt(DirectionEnum.Right);
+            const down = @enumToInt(DirectionEnum.Down);
+            const left = @enumToInt(DirectionEnum.Left);
+            // const below = @enumToInt(DirectionEnum.Below);
             canvas.*[y][x] = DrawBlock{
-                .up_row = @as([3]u8, "   ".*),
-                .mid_row = [_]u8{' '} ++ [_]u8{b_char} ++ [_]u8{' '},
-                .bot_row = [_]u8{c} ++ @as([2]u8, "  ".*),
+                // .up_row = [3]u8{ c_dirs[above], c_dirs[up], ' ' },
+                .up_row = [3]u8{ ' ', c_dirs[up], ' ' },
+                .mid_row = [3]u8{ c_dirs[left], c_block, c_dirs[right] },
+                .bot_row = [3]u8{ c_power, c_dirs[down], ' ' },
+                // .bot_row = [3]u8{ c_power, c_dirs[down], c_dirs[below] },
             };
         }
     }
