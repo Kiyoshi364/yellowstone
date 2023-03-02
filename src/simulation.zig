@@ -69,53 +69,70 @@ pub fn update(
             const y = pos[0];
             const x = pos[1];
             const b = newstate.block_grid[y][x];
-            var this_power = switch (b) {
+            switch (b) {
                 .empty => {
                     const empty_is_ok = std.meta.eql(
                         Power.EMPTY_POWER,
                         newstate.power_grid[y][x],
                     );
                     std.debug.assert(empty_is_ok);
-                    continue;
                 },
                 .source => {
                     newstate.power_grid[y][x] = Power.SOURCE_POWER;
-                    continue;
                 },
-                else => @as(Power.PowerInt, 0),
-            };
-            for (directions) |d| {
-                if (d.inbounds(usize, y, x, height, width)) |npos| {
-                    const ny = npos[0];
-                    const nx = npos[1];
-                    const that_power =
-                        newstate.power_grid[ny][nx].power;
-                    if (that_power < 0) {
-                        const is_a_source =
-                            that_power == Power.SOURCE_POWER.power;
-                        std.debug.assert(is_a_source);
-                        this_power = Power.FROM_SOURCE_POWER.power;
-                    } else if (this_power < that_power) {
-                        this_power = that_power - 1;
-                    }
-                }
-            }
-            this_power = switch (b) {
-                .empty, .source => unreachable,
-                .wire => this_power,
-                .block => @min(Power.BLOCK_MAX_VALUE, this_power),
-            };
-            if (this_power != newstate.power_grid[y][x].power) {
-                newstate.power_grid[y][x].power = this_power;
-                for (directions) |d| {
-                    if (d.inbounds(usize, y, x, height, width)) |npos| {
-                        try mod_stack.append(npos);
-                    }
-                }
+                .wire, .block => try update_wire_or_block(
+                    &newstate,
+                    &mod_stack,
+                    y,
+                    x,
+                    b,
+                ),
             }
         }
     }
     return newstate;
+}
+
+fn update_wire_or_block(
+    newstate: *State,
+    mod_stack: *std.ArrayList([2]usize),
+    y: usize,
+    x: usize,
+    b: Block,
+) Allocator.Error!void {
+    std.debug.assert(b == .wire or b == .block);
+    var this_power = @as(Power.PowerInt, 0);
+    for (directions) |d| {
+        if (d.inbounds(usize, y, x, height, width)) |npos| {
+            const ny = npos[0];
+            const nx = npos[1];
+            const that_power =
+                newstate.power_grid[ny][nx].power;
+            if (that_power < 0) {
+                const is_a_source =
+                    that_power == Power.SOURCE_POWER.power;
+                std.debug.assert(is_a_source);
+                this_power = Power.FROM_SOURCE_POWER.power;
+            } else if (this_power < that_power) {
+                this_power = that_power - 1;
+            }
+        }
+    }
+    this_power = switch (b) {
+        .empty,
+        .source,
+        => unreachable,
+        .wire => this_power,
+        .block => @min(Power.BLOCK_MAX_VALUE, this_power),
+    };
+    if (this_power != newstate.power_grid[y][x].power) {
+        newstate.power_grid[y][x].power = this_power;
+        for (directions) |d| {
+            if (d.inbounds(usize, y, x, height, width)) |npos| {
+                try mod_stack.append(npos);
+            }
+        }
+    }
 }
 
 pub fn render(
