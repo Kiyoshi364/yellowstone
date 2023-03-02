@@ -71,9 +71,10 @@ pub fn update(
             const b = newstate.block_grid[y][x];
             var this_power = switch (b) {
                 .empty => {
-                    const empty_is_ok =
-                        Power.EMPTY_POWER
-                        .isEqual(newstate.power_grid[y][x]);
+                    const empty_is_ok = std.meta.eql(
+                        Power.EMPTY_POWER,
+                        newstate.power_grid[y][x],
+                    );
                     std.debug.assert(empty_is_ok);
                     continue;
                 },
@@ -81,7 +82,7 @@ pub fn update(
                     newstate.power_grid[y][x] = Power.SOURCE_POWER;
                     continue;
                 },
-                else => @as(u5, 0),
+                else => @as(Power.PowerInt, 0),
             };
             for (directions) |d| {
                 if (d.inbounds(usize, y, x, height, width)) |npos| {
@@ -89,7 +90,12 @@ pub fn update(
                     const nx = npos[1];
                     const that_power =
                         newstate.power_grid[ny][nx].power;
-                    if (this_power < that_power) {
+                    if (that_power < 0) {
+                        const is_a_source =
+                            that_power == Power.SOURCE_POWER.power;
+                        std.debug.assert(is_a_source);
+                        this_power = Power.FROM_SOURCE_POWER.power;
+                    } else if (this_power < that_power) {
                         this_power = that_power - 1;
                     }
                 }
@@ -121,7 +127,8 @@ pub fn render(
     for (state.block_grid, 0..) |row, y| {
         for (row, 0..) |b, x| {
             const powers = @as(*const [17]u8, " 123456789abcdef*");
-            const c = powers[state.power_grid[y][x].power];
+            const power_index = state.power_grid[y][x].to_index();
+            const c = powers[power_index];
             const b_char = switch (b) {
                 .empty => @as(u8, ' '),
                 .source => @as(u8, 'S'),
