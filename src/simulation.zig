@@ -52,13 +52,29 @@ pub fn update(
             .empty => {},
             .putBlock => |i| {
                 newstate.block_grid[i.y][i.x] = i.block;
-                newstate.power_grid[i.y][i.x] = .{};
+                newstate.power_grid[i.y][i.x] = switch (i.block) {
+                    .empty => Power.EMPTY_POWER,
+                    .source => Power.SOURCE_POWER,
+                    .wire,
+                    .block,
+                    => Power.BLOCK_OFF_POWER,
+                };
                 for (directions) |d| {
                     if (d.inbounds(usize, i.y, i.x, height, width)) |npos| {
                         try mod_stack.append(npos);
                     }
                 }
-                try mod_stack.append([_]usize{ i.y, i.x });
+                const should_update = switch (i.block) {
+                    .empty,
+                    .source,
+                    => false,
+                    .wire,
+                    .block,
+                    => true,
+                };
+                if (should_update) {
+                    try mod_stack.append([_]usize{ i.y, i.x });
+                }
             },
         }
     }
@@ -79,7 +95,11 @@ pub fn update(
                     std.debug.assert(empty_is_ok);
                 },
                 .source => {
-                    newstate.power_grid[y][x] = Power.SOURCE_POWER;
+                    const source_is_ok = std.meta.eql(
+                        Power.SOURCE_POWER,
+                        newstate.power_grid[y][x],
+                    );
+                    std.debug.assert(source_is_ok);
                 },
                 .wire, .block => try update_wire_or_block(
                     &newstate,
