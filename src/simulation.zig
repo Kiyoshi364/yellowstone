@@ -18,6 +18,8 @@ pub const height = width / 2;
 pub const State = struct {
     block_grid: [height][width]Block,
     power_grid: [height][width]Power,
+
+    const Pos = [2]usize;
 };
 
 pub const Input = union(enum) {
@@ -43,8 +45,7 @@ pub fn update(
 ) Allocator.Error!State {
     var newstate = state;
 
-    const Pos = [2]usize;
-    var mod_stack = std.ArrayList(Pos).init(alloc);
+    var mod_stack = std.ArrayList(State.Pos).init(alloc);
     defer mod_stack.deinit();
 
     { // handle input
@@ -116,7 +117,7 @@ pub fn update(
 
 fn update_wire_or_block(
     newstate: *State,
-    mod_stack: *std.ArrayList([2]usize),
+    mod_stack: *std.ArrayList(State.Pos),
     y: usize,
     x: usize,
     b: Block,
