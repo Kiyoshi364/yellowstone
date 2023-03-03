@@ -20,7 +20,47 @@ pub const State = struct {
     power_grid: [height][width]Power,
 
     const Pos = [2]usize;
+
+    const BlockIter = struct {
+        y: usize = 0,
+        x: usize = 0,
+
+        pub fn next_pos(self: *BlockIter) ?State.Pos {
+            if (self.y < height) {
+                std.debug.assert(self.x < width);
+                const pos = Pos{ self.y, self.x };
+                if (self.x < width - 1) {
+                    self.x += 1;
+                } else {
+                    std.debug.assert(self.x == width - 1);
+                    self.y += 1;
+                    self.x = 1;
+                }
+                return pos;
+            } else {
+                return null;
+            }
+        }
+
+        pub fn next_block(self: *BlockIter, state: State) ?Block {
+            return if (self.next_pos()) |pos|
+                state.block_grid[pos.y][pos.x]
+            else
+                null;
+        }
+
+        pub fn next_power(self: *BlockIter, state: State) ?Power {
+            return if (self.next_pos()) |pos|
+                state.power_grid[pos.y][pos.x]
+            else
+                null;
+        }
+    };
 };
+
+test "State compiles!" {
+    std.testing.refAllDeclsRecursive(State);
+}
 
 pub const Input = union(enum) {
     empty,
