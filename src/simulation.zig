@@ -13,7 +13,7 @@ pub const simulation = lib_sim.Sandboxed(State, Input, Render){
     .render = render,
 };
 
-pub const width = 8;
+pub const width = 16;
 pub const height = width / 2;
 pub const State = struct {
     block_grid: [height][width]Block,
@@ -88,6 +88,44 @@ pub fn update(
     var mod_stack = std.ArrayList(State.Pos).init(alloc);
     defer mod_stack.deinit();
 
+    { // push "delayed machines" interactions
+        // Note: this is before "handle input"
+        // because update_list is a stack
+        // and this should be handled after
+        // (not that it matters)
+        var block_it = State.BlockIter{};
+        while (block_it.next_pos()) |pos| {
+            const y = pos[0];
+            const x = pos[1];
+            const b = newstate.block_grid[y][x];
+            switch (b) {
+                .empty,
+                .source,
+                .wire,
+                .block,
+                => {},
+                .repeater => {
+                    // Note: here should be a great place
+                    // to "do nothing" if repeater's output
+                    // was the same.
+                    // But we don't have this information
+                    // (only what we will output now)
+                    if (b.facing().?.inbounds(
+                        usize,
+                        y,
+                        x,
+                        height,
+                        width,
+                    )) |front_pos| {
+                        try mod_stack.append(front_pos);
+                    } else {
+                        // Empty
+                    }
+                },
+            }
+        }
+    }
+
     { // handle input
         switch (input) {
             .empty => {},
@@ -99,6 +137,10 @@ pub fn update(
                     .wire,
                     .block,
                     => Power.BLOCK_OFF_POWER,
+                    .repeater => |r| blk: {
+                        std.debug.assert(r.is_valid());
+                        break :blk Power.REPEATER_POWER;
+                    },
                 };
                 for (directions) |d| {
                     if (d.inbounds(usize, i.y, i.x, height, width)) |npos| {
@@ -108,6 +150,7 @@ pub fn update(
                 const should_update = switch (i.block) {
                     .empty,
                     .source,
+                    .repeater,
                     => false,
                     .wire,
                     .block,
@@ -149,7 +192,47 @@ pub fn update(
                     x,
                     b,
                 ),
+                .repeater => |r| {
+                    const repeater_is_ok = std.meta.eql(
+                        Power.REPEATER_POWER,
+                        newstate.power_grid[y][x],
+                    );
+                    std.debug.assert(repeater_is_ok);
+                    std.debug.assert(r.is_valid());
+                },
             }
+        }
+    }
+
+    { // For each repeater, shift input
+        var block_it = State.BlockIter{};
+        while (block_it.next_pos()) |pos| {
+            const y = pos[0];
+            const x = pos[1];
+            const b = newstate.block_grid[y][x];
+            if (b != .repeater) continue;
+            const rep = b.repeater;
+            const back_dir = rep.facing.back();
+            const curr_in: u1 =
+                if (back_dir.inbounds(usize, y, x, height, width)) |bpos|
+            blk: {
+                const power = newstate.power_grid[bpos[0]][bpos[1]];
+                break :blk switch (power.power) {
+                    0 => 0,
+                    1...15 => 1,
+                    Power.SOURCE_POWER.power => 1,
+                    Power.REPEATER_POWER.power => blk2: {
+                        const prev_b_block =
+                            state.block_grid[bpos[0]][bpos[1]];
+                        break :blk2 if (prev_b_block == .repeater)
+                            prev_b_block.repeater.next_out()
+                        else
+                            0;
+                    },
+                    else => unreachable,
+                };
+            } else 0;
+            newstate.block_grid[y][x] = .{ .repeater = rep.shift(curr_in) };
         }
     }
     return newstate;
@@ -171,11 +254,40 @@ fn update_wire_or_block(
             const that_power =
                 newstate.power_grid[ny][nx].power;
             if (that_power < 0) {
+                const that_block = newstate.block_grid[ny][nx];
                 const is_a_source =
                     that_power == Power.SOURCE_POWER.power;
-                std.debug.assert(is_a_source);
-                this_power = Power.FROM_SOURCE_POWER.power;
-            } else if (this_power < that_power) {
+                const is_a_repeater =
+                    that_power == Power.REPEATER_POWER.power;
+                if (is_a_source) {
+                    std.debug.assert(that_block == .source or
+                        that_block == .block);
+                    this_power = Power.FROM_SOURCE_POWER.power;
+                } else if (is_a_repeater) {
+                    std.debug.assert(that_block == .repeater);
+                    const is_on = that_block.repeater.is_on();
+                    const is_facing_me = std.meta.eql(
+                        d,
+                        that_block.facing().?.back().toDirection(),
+                    );
+                    if (is_on and is_facing_me) {
+                        if (b == .wire) {
+                            this_power = Power.FROM_REPEATER_POWER.power;
+                        } else {
+                            std.debug.assert(b == .block);
+                            this_power = Power.SOURCE_POWER.power;
+                        }
+                    }
+                } else {
+                    std.debug.print(
+                        "this: (y: {}, x: {}) b: {} - that: (y: {}, x: {}) b:{} p: {}\n",
+                        .{ y, x, b, ny, nx, that_block, that_power },
+                    );
+                    unreachable;
+                }
+            } else if (0 <= this_power and
+                this_power < that_power)
+            {
                 this_power = that_power - 1;
             }
         }
@@ -183,6 +295,7 @@ fn update_wire_or_block(
     this_power = switch (b) {
         .empty,
         .source,
+        .repeater,
         => unreachable,
         .wire => this_power,
         .block => @min(Power.BLOCK_MAX_VALUE, this_power),
@@ -207,12 +320,18 @@ pub fn render(
         for (row, 0..) |b, x| {
             const char_powers = @as(*const [17]u8, " 123456789abcdef*");
             const power_index = state.power_grid[y][x].to_index();
-            const c_power = char_powers[power_index];
+            const c_power = if (power_index < char_powers.len)
+                char_powers[power_index]
+            else blk: {
+                std.debug.assert(b == .repeater);
+                break :blk char_powers[b.repeater.memory];
+            };
             const c_block = switch (b) {
                 .empty => @as(u8, ' '),
                 .source => @as(u8, 'S'),
                 .wire => @as(u8, 'w'),
                 .block => @as(u8, 'B'),
+                .repeater => @as(u8, 'r'),
             };
             const char_dirs = @as(*const [6]u8, "o^>v<x");
             var c_dirs = @as([6]u8, "      ".*);

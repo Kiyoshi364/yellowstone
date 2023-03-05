@@ -13,7 +13,11 @@ const Power = @This();
 
 pub const EMPTY_POWER = Power{ .power = 0 };
 pub const SOURCE_POWER = Power{ .power = -16 };
+pub const REPEATER_POWER = Power{ .power = -15 };
+
 pub const FROM_SOURCE_POWER = Power{ .power = 15 };
+pub const FROM_REPEATER_POWER = FROM_SOURCE_POWER;
+
 pub const BLOCK_ON_POWER = Power{ .power = 1 };
 pub const BLOCK_OFF_POWER = Power{ .power = 0 };
 
@@ -23,6 +27,10 @@ test "static asserts for constants" {
     try std.testing.expectEqual(
         SOURCE_POWER.power,
         FROM_SOURCE_POWER.power +% 1,
+    );
+    try std.testing.expectEqual(
+        FROM_REPEATER_POWER,
+        FROM_SOURCE_POWER,
     );
 }
 

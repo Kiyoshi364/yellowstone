@@ -15,11 +15,26 @@ pub fn main() !void {
 
     var state = sim.emptyState;
     state.block_grid[0] = .{.{ .wire = .{} }} ** sim.width;
-    state.block_grid[2] = .{.{ .wire = .{} }} ** sim.width;
+    state.block_grid[2] = .{.{ .wire = .{} }} ** 8 ++
+        .{.empty} ** (sim.width - 8);
     state.block_grid[1][7] = .{ .wire = .{} };
+    state.block_grid[1][9] = .{ .repeater = .{
+        .delay = .one,
+        .facing = .Down,
+    } };
+    state.power_grid[1][9] = .{ .power = -15 };
+    state.block_grid[2][9] = .{ .block = .{} };
     state.block_grid[3][2] = .{ .wire = .{} };
     state.block_grid[3][3] = .{ .wire = .{} };
     state.block_grid[3][4] = .{ .wire = .{} };
+    state.block_grid[3][7] = .{ .wire = .{} };
+    state.block_grid[3][9] = .{ .wire = .{} };
+    state.block_grid[3][10] = .{ .repeater = .{
+        .delay = .two,
+        .facing = .Right,
+    } };
+    state.power_grid[3][10] = .{ .power = -15 };
+    state.block_grid[3][11] = .{ .block = .{} };
 
     const inputs = [_]sim.Input{
         .empty,
@@ -27,6 +42,11 @@ pub fn main() !void {
             .y = 0,
             .x = 0,
             .block = .{ .source = .{} },
+        } },
+        .{ .putBlock = .{
+            .y = 0,
+            .x = 8,
+            .block = .{ .block = .{} },
         } },
         .{ .putBlock = .{
             .y = 2,
