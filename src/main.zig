@@ -68,37 +68,48 @@ pub fn main() !void {
     }
 }
 
+fn print_repeat_ln(
+    writer: anytype,
+    comptime fmt: []const u8,
+    args: anytype,
+    times: usize,
+) !void {
+    var i = @as(usize, 0);
+    while (i < times) : (i += 1) {
+        try writer.print(fmt, args);
+    }
+    try writer.print("\n", .{});
+}
+
 fn draw(state: sim.State, alloc: std.mem.Allocator) !void {
     const render = try sim.render(state, alloc);
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
 
-    try stdout.print("=", .{});
-    for (render[0]) |_| {
-        try stdout.print("====", .{});
-    } else try stdout.print("\n", .{});
+    try print_repeat_ln(stdout, "=", .{}, render[0].len * 4 + 1);
+
     try stdout.print("+", .{});
-    for (render[0]) |_| {
-        try stdout.print("---+", .{});
-    } else try stdout.print("\n", .{});
+    try print_repeat_ln(stdout, "---+", .{}, render[0].len);
+
     for (render) |row| {
         try stdout.print("|", .{});
         for (row) |x| {
             try stdout.print("{s: ^3}|", .{x.up_row});
         } else try stdout.print("\n", .{});
+
         try stdout.print("|", .{});
         for (row) |x| {
             try stdout.print("{s: ^3}|", .{x.mid_row});
         } else try stdout.print("\n", .{});
+
         try stdout.print("|", .{});
         for (row) |x| {
             try stdout.print("{s: ^3}|", .{x.bot_row});
         } else try stdout.print("\n", .{});
+
         try stdout.print("+", .{});
-        for (row) |_| {
-            try stdout.print("---+", .{});
-        } else try stdout.print("\n", .{});
+        try print_repeat_ln(stdout, "---+", .{}, render[0].len);
     }
     try bw.flush();
 }
