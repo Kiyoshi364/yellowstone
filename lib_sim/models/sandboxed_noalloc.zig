@@ -1,11 +1,9 @@
 pub fn SandboxedNoAlloc(
     comptime State: type,
     comptime Input: type,
-    comptime Render: type,
 ) type {
     return struct {
         update: fn (State, Input) State,
-        render: fn (State) Render,
 
         const Self = @This();
 
@@ -26,13 +24,6 @@ pub fn SandboxedNoAlloc(
             return for (inputs) |input| {
                 curr_state = self.step(curr_state, input);
             } else curr_state;
-        }
-
-        pub fn view(
-            comptime self: Self,
-            state: State,
-        ) Render {
-            return self.render(state);
         }
     };
 }

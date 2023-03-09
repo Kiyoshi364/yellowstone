@@ -62,14 +62,14 @@ pub fn main() !void {
 
     for (inputs) |input| {
         state = try simulation.step(state, input, alloc);
-        const render = try simulation.view(state, alloc);
-        try draw(render);
+        try draw(state, alloc);
 
         std.debug.assert(arena.reset(.{ .free_all = {} }));
     }
 }
 
-fn draw(render: sim.Render) !void {
+fn draw(state: sim.State, alloc: std.mem.Allocator) !void {
+    const render = try sim.render(state, alloc);
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();

@@ -8,9 +8,8 @@ const Block = block.Block;
 
 const Power = @import("Power.zig");
 
-pub const simulation = lib_sim.Sandboxed(State, Input, Render){
+pub const simulation = lib_sim.Sandboxed(State, Input){
     .update = update,
-    .render = render,
 };
 
 pub const width = 16;

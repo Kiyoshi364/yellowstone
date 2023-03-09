@@ -8,15 +8,9 @@ pub const Input = enum {
     Inc,
     Dec,
 };
-pub const Render = State;
 
-pub const sim = Simulation.SandboxedNoAlloc(
-    State,
-    Input,
-    Render,
-){
+pub const sim = Simulation.SandboxedNoAlloc(State, Input){
     .update = update,
-    .render = render,
 };
 
 pub const init = @as(State, 0);
@@ -26,10 +20,6 @@ pub fn update(state: State, input: Input) State {
         .Inc => state +| 1,
         .Dec => state -| 1,
     };
-}
-
-pub fn render(state: State) Render {
-    return state;
 }
 
 test "sizeof simulation is 0" {
@@ -60,11 +50,4 @@ test "run" {
     };
     const new_state = sim.run(state, inputs);
     try std.testing.expectEqual(@as(State, 2), new_state);
-}
-
-test "view" {
-    const state = @as(State, 0);
-    const view = sim.view(state);
-    // Note: in this simulation ( State == Render )
-    try std.testing.expectEqual(state, view);
 }
