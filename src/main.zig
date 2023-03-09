@@ -62,7 +62,7 @@ pub fn main() !void {
 
     for (inputs) |input| {
         state = try simulation.step(state, input, alloc);
-        try draw(state, alloc);
+        try draw(state, input, alloc);
 
         std.debug.assert(arena.reset(.{ .free_all = {} }));
     }
@@ -81,11 +81,30 @@ fn print_repeat_ln(
     try writer.print("\n", .{});
 }
 
-fn draw(state: sim.State, alloc: std.mem.Allocator) !void {
+fn print_input_ln(writer: anytype, input: sim.Input) !void {
+    try writer.print("= Input: ", .{});
+    switch (input) {
+        .empty => try writer.print("Step", .{}),
+        .putBlock => |i| {
+            try writer.print("Put .{s} at (y: {}, x: {})", .{
+                @tagName(i.block),
+                i.y,
+                i.x,
+            });
+        },
+    }
+    try writer.print("\n", .{});
+}
+
+fn draw(state: sim.State, input: sim.Input, alloc: std.mem.Allocator) !void {
     const render = try sim.render(state, alloc);
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
+
+    try print_repeat_ln(stdout, "=", .{}, render[0].len * 4 + 1);
+
+    try print_input_ln(stdout, input);
 
     try print_repeat_ln(stdout, "=", .{}, render[0].len * 4 + 1);
 
