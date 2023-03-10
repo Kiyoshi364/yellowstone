@@ -323,7 +323,7 @@ pub fn render(
                 char_powers[power_index]
             else blk: {
                 std.debug.assert(b == .repeater);
-                break :blk char_powers[b.repeater.memory];
+                break :blk char_powers[b.repeater.get_memory()];
             };
             const c_block = switch (b) {
                 .empty => @as(u8, ' '),

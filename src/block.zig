@@ -1,7 +1,7 @@
 const Direction = @import("Direction.zig");
 const DirectionEnum = Direction.DirectionEnum;
 
-const Repeater = @import("repeater.zig").Repeater;
+pub const Repeater = @import("repeater.zig").Repeater;
 
 pub const BlockType = enum(u4) {
     empty = 0,

@@ -81,6 +81,14 @@ pub const CanonicalRepeater = struct {
         };
     }
 
+    pub fn init_mem(facing: DirectionEnum, delay: Delay, mem: u4) CanonicalRepeater {
+        return .{
+            .facing = facing,
+            .delay = delay,
+            .memory = mem,
+        };
+    }
+
     pub fn is_valid(r: CanonicalRepeater) bool {
         return ~r.delay.mask() & r.memory == 0;
     }
