@@ -123,23 +123,42 @@ pub const CanonicalRepeater = struct {
     }
 };
 
+const SeqIter = struct {
+    delay: Delay,
+    i: u4 = 0,
+    done: bool = false,
+
+    fn init(delay: Delay) SeqIter {
+        return .{ .delay = delay };
+    }
+
+    fn next(self: *SeqIter) ?u4 {
+        const max_seq = @shlExact(
+            @as(u5, 2),
+            @enumToInt(self.delay),
+        );
+        return if (self.done)
+            null
+        else blk: {
+            const seq = self.i;
+            const ov = @addWithOverflow(self.i, 1);
+            self.i = ov[0];
+            self.done = ov[1] == 1 or self.i >= max_seq;
+            break :blk seq;
+        };
+    }
+};
+
 fn test_repeater_with_facing_delay(
     comptime RepeaterType: type,
     facing: DirectionEnum,
     delay: Delay,
 ) !void {
     var rep = RepeaterType.init(facing, delay);
-    var overflow = @as(u1, 0);
-    var sequence = @as(u4, 0);
     var last_seq = @as(?u4, null);
-    const max_seq = @shlExact(@as(u5, 2), @enumToInt(delay));
+    var seq_iter = SeqIter.init(delay);
 
-    while (overflow == 0 and sequence < max_seq) : ({
-        last_seq = sequence;
-        const ov = @addWithOverflow(sequence, 1);
-        sequence = ov[0];
-        overflow = ov[1];
-    }) {
+    while (seq_iter.next()) |sequence| : (last_seq = sequence) {
         var bit_i = @as(u3, 0);
         while (bit_i <= @enumToInt(delay)) : (bit_i += 1) {
             const i = @intCast(u2, bit_i);
