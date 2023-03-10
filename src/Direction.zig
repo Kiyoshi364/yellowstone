@@ -23,6 +23,14 @@ pub const DirectionEnum = enum(u3) {
 
     pub const count = 4; // 6;
 
+    pub const directions = blk: {
+        var ds = @as([count]DirectionEnum, undefined);
+        for (Direction.directions, 0..) |d, i| {
+            ds[i] = fromDirection(d).?;
+        }
+        break :blk ds;
+    };
+
     pub fn back(self: DirectionEnum) DirectionEnum {
         return switch (self) {
             // .Above => .Below,
@@ -43,6 +51,26 @@ pub const DirectionEnum = enum(u3) {
             .Left => LEFT,
             // .Below => BELOW,
         };
+    }
+
+    pub fn fromDirection(d: Direction) ?DirectionEnum {
+        const eql = std.meta.eql;
+        return
+        // if (eql(d, ABOVE))
+        //     .Above
+        // else if (eql(d, UP))
+        if (eql(d, UP))
+            .Up
+        else if (eql(d, RIGHT))
+            .Right
+        else if (eql(d, DOWN))
+            .Down
+        else if (eql(d, LEFT))
+            .Left
+            // else if (eql(d, BELOW))
+            //     .Below
+        else
+            null;
     }
 
     pub fn inbounds(
