@@ -3,7 +3,7 @@ const std = @import("std");
 const Direction = @import("Direction.zig");
 const DirectionEnum = Direction.DirectionEnum;
 
-pub const Repeater = CanonicalRepeater;
+pub const Repeater = ImplicitDelayRepeater;
 
 pub const Delay = enum(u2) {
     one = 0,
@@ -230,6 +230,118 @@ test "CanonicalRepeater" {
         for (delays) |delay| {
             try test_repeater_with_facing_delay(
                 CanonicalRepeater,
+                facing,
+                delay,
+            );
+        }
+    }
+}
+
+pub const ImplicitDelayRepeater = struct {
+    facing: DirectionEnum,
+
+    /// Please, look at CanonicalRepeater.memory for reference.
+    /// This is the same but in a compressed form.
+    ///
+    /// The `delay` is encoded in the following way
+    /// (`x` represent `memory` bits):
+    ///
+    /// - `0b0000x`: invalid
+    /// - `0b0001x`: `.one`
+    /// - `0b001xx`: `.two`
+    /// - `0b01xxx`: `.three`
+    /// - `0b1xxxx`: `.four`
+    data: u5,
+
+    pub fn init(facing: DirectionEnum, delay: Delay) ImplicitDelayRepeater {
+        return init_mem(facing, delay, 0);
+    }
+
+    pub fn init_mem(facing: DirectionEnum, delay: Delay, mem: u4) ImplicitDelayRepeater {
+        return .{
+            .facing = facing,
+            .data = pack_delay_mem(delay, mem),
+        };
+    }
+
+    inline fn pack_delay_mem(delay: Delay, mem: u4) u5 {
+        const idelay = @enumToInt(delay);
+        const not_m_mask = @as(u5, 0b11110) << idelay;
+        const delay_bits = @as(u5, 0b00010) << idelay;
+
+        std.debug.assert(not_m_mask & mem == 0);
+
+        return delay_bits | mem;
+    }
+
+    inline fn unpack_delay_mem(in: u5) struct { delay: Delay, mem: u4 } {
+        const clz = @clz(@intCast(u3, in >> 2));
+        const delay = @intToEnum(Delay, 3 - clz);
+
+        return .{
+            .delay = delay,
+            .mem = @intCast(u4, in & delay.mask()),
+        };
+    }
+
+    pub fn is_valid(r: ImplicitDelayRepeater) bool {
+        return @clz(r.data) < 4;
+    }
+
+    pub fn get_delay(r: ImplicitDelayRepeater) Delay {
+        const pack = unpack_delay_mem(r.data);
+        return pack.delay;
+    }
+
+    pub fn get_memory(r: ImplicitDelayRepeater) u4 {
+        const pack = unpack_delay_mem(r.data);
+        return pack.mem;
+    }
+
+    pub fn shift(r: ImplicitDelayRepeater, curr_in: u1) ImplicitDelayRepeater {
+        std.debug.assert(r.is_valid());
+        const clz = @clz(r.data);
+        const flip_mask = @shlExact(
+            @as(u5, 0b11) ^ @as(u5, curr_in),
+            3 - clz,
+        );
+        const data = (r.data >> 1) ^ flip_mask;
+
+        return .{
+            .facing = r.facing,
+            .data = data,
+        };
+    }
+
+    pub fn next_out(r: ImplicitDelayRepeater) u1 {
+        return @intCast(u1, r.data & 1);
+    }
+
+    pub fn is_on(r: ImplicitDelayRepeater) bool {
+        return r.next_out() == 1;
+    }
+
+    test "ImplicitDelayRepeater.pack and ImplicitDelayRepeater.unpack}" {
+        const delays = [_]Delay{ .one, .two, .three, .four };
+        for (delays) |delay| {
+            var seq_iter = SeqIter.init(delay);
+            while (seq_iter.next()) |seq| {
+                const data = pack_delay_mem(delay, seq);
+                const pack = unpack_delay_mem(data);
+                try std.testing.expectEqual(delay, pack.delay);
+                try std.testing.expectEqual(seq, pack.mem);
+            }
+        }
+    }
+};
+
+test "ImplicitDelayRepeater" {
+    const directions = DirectionEnum.directions;
+    const delays = [_]Delay{ .one, .two, .three, .four };
+    for (directions) |facing| {
+        for (delays) |delay| {
+            try test_repeater_with_facing_delay(
+                ImplicitDelayRepeater,
                 facing,
                 delay,
             );
