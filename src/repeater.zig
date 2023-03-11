@@ -158,6 +158,7 @@ fn test_repeater_with_facing_delay(
     var last_seq = @as(?u4, null);
     var seq_iter = SeqIter.init(delay);
 
+    const bits = @enumToInt(delay) +% 1;
     while (seq_iter.next()) |sequence| : (last_seq = sequence) {
         var bit_i = @as(u3, 0);
         while (bit_i <= @enumToInt(delay)) : (bit_i += 1) {
@@ -169,10 +170,21 @@ fn test_repeater_with_facing_delay(
             );
 
             const ls = last_seq orelse 0;
-            const last_bit = @intCast(
-                u1,
-                @shrExact(ls & bit_mask, i),
+
+            const new_mask = @intCast(
+                u4,
+                @shlExact(@as(u5, 1), i) - 1,
             );
+            const old_mask = ~new_mask;
+
+            const old_mem = @shrExact(ls & old_mask, i);
+            const new_mem = @shlExact(
+                sequence & new_mask,
+                bits -% i,
+            );
+
+            const mem = new_mem | old_mem;
+            const last_bit = @intCast(u1, old_mem & 1);
             try std.testing.expectEqual(
                 last_bit,
                 rep.next_out(),
@@ -182,6 +194,7 @@ fn test_repeater_with_facing_delay(
                 rep.is_on(),
             );
             try std.testing.expectEqual(delay, rep.get_delay());
+            try std.testing.expectEqual(mem, rep.get_memory());
             rep = rep.shift(bit);
         }
     }
