@@ -39,7 +39,6 @@ pub fn main() !void {
     };
 
     const inputs = [_]sim.Input{
-        .empty,
         .{ .putBlock = .{
             .y = 0,
             .x = 0,
@@ -67,13 +66,70 @@ pub fn main() !void {
         .cursor = .{0} ** 2,
     };
 
-    for (inputs) |input| {
-        const ctlinput = .{ .step = input };
+    const stdin_file = std.io.getStdIn().reader();
+    var br = std.io.bufferedReader(stdin_file);
+    const stdin = br.reader();
+
+    const term = try config_term();
+    defer term.unconfig_term() catch unreachable;
+
+    try ctl.draw(ctlstate, alloc);
+    var i = @as(usize, 0);
+    while (i < inputs.len) {
+        const ctlinput = try read_ctlinput(&stdin, inputs[i], &i) orelse {
+            break;
+        };
+
         ctlstate = try controler.step(ctlstate, ctlinput, alloc);
         try ctl.draw(ctlstate, alloc);
 
         std.debug.assert(arena.reset(.{ .free_all = {} }));
     }
+}
+
+fn read_ctlinput(
+    reader: anytype,
+    input: sim.Input,
+    i: *usize,
+) !?ctl.CtlInput {
+    var buffer = @as([1]u8, undefined);
+    var loop = true;
+    return while (loop) {
+        const size = try reader.read(&buffer);
+        if (size == 0) continue;
+        switch (buffer[0]) {
+            ' ' => {
+                i.* += 1;
+                break .{ .step = input };
+            },
+            'w' => break .{ .moveCursor = .Up },
+            's' => break .{ .moveCursor = .Down },
+            'a' => break .{ .moveCursor = .Left },
+            'd' => break .{ .moveCursor = .Right },
+            'q' => break null,
+            else => {},
+        }
+    } else unreachable;
+}
+
+const Term = struct {
+    old_term: std.os.termios,
+
+    fn unconfig_term(self: Term) !void {
+        const fd = 0;
+        try std.os.tcsetattr(fd, .NOW, self.old_term);
+    }
+};
+
+fn config_term() !Term {
+    const fd = 0;
+    const old_term = try std.os.tcgetattr(fd);
+    var new_term = old_term;
+    new_term.lflag &= ~(std.os.linux.ICANON | std.os.linux.ECHO);
+    try std.os.tcsetattr(fd, .NOW, new_term);
+    return .{
+        .old_term = old_term,
+    };
 }
 
 test "It compiles!" {

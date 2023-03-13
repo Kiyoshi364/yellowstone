@@ -68,24 +68,27 @@ fn print_repeat_ln(
     try writer.print("\n", .{});
 }
 
-fn print_input_ln(writer: anytype, input: sim.Input) !void {
-    try writer.print("= Input: ", .{});
-    switch (input) {
-        .empty => try writer.print("Step", .{}),
-        .putBlock => |i| {
-            try writer.print("Put .{s} at (y: {}, x: {})", .{
-                @tagName(i.block),
-                i.y,
-                i.x,
-            });
-        },
+fn print_input_ln(writer: anytype, m_input: ?sim.Input) !void {
+    if (m_input) |input| {
+        try writer.print("= Input: ", .{});
+        switch (input) {
+            .empty => try writer.print("Step", .{}),
+            .putBlock => |i| {
+                try writer.print("Put .{s} at (y: {}, x: {})", .{
+                    @tagName(i.block),
+                    i.y,
+                    i.x,
+                });
+            },
+        }
+    } else {
+        try writer.print("= Start", .{});
     }
     try writer.print("\n", .{});
 }
 
 pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
     const state = ctl.sim_state;
-    const input = ctl.last_input orelse .empty;
     const render = try sim.render(state, alloc);
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
@@ -93,7 +96,11 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
 
     try print_repeat_ln(stdout, "=", .{}, render[0].len * 4 + 1);
 
-    try print_input_ln(stdout, input);
+    try print_input_ln(stdout, ctl.last_input);
+    try stdout.print(
+        "= y: {d:0>3} x: {d:0>3}\n",
+        .{ ctl.cursor[0], ctl.cursor[1] },
+    );
 
     try print_repeat_ln(stdout, "=", .{}, render[0].len * 4 + 1);
 
