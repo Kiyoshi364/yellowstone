@@ -4,6 +4,7 @@ const lib_sim = @import("lib_sim");
 
 pub const block = @import("block.zig");
 pub const sim = @import("simulation.zig");
+pub const ctl = @import("controler.zig");
 
 pub fn main() !void {
     var arena =
@@ -11,28 +12,31 @@ pub fn main() !void {
     defer arena.deinit();
     const alloc = arena.allocator();
 
-    const simulation = sim.simulation;
+    const controler = ctl.controler;
 
-    var state = sim.emptyState;
-    state.block_grid[0] = .{.{ .wire = .{} }} ** sim.width;
-    state.block_grid[2] = .{.{ .wire = .{} }} ** 8 ++
-        .{.empty} ** (sim.width - 8);
-    state.block_grid[1][7] = .{ .wire = .{} };
-    state.block_grid[1][9] = .{
-        .repeater = block.Repeater.init(.Down, .one),
+    const state = blk: {
+        var state = sim.emptyState;
+        state.block_grid[0] = .{.{ .wire = .{} }} ** sim.width;
+        state.block_grid[2] = .{.{ .wire = .{} }} ** 8 ++
+            .{.empty} ** (sim.width - 8);
+        state.block_grid[1][7] = .{ .wire = .{} };
+        state.block_grid[1][9] = .{
+            .repeater = block.Repeater.init(.Down, .one),
+        };
+        state.power_grid[1][9] = .{ .power = -15 };
+        state.block_grid[2][9] = .{ .block = .{} };
+        state.block_grid[3][2] = .{ .wire = .{} };
+        state.block_grid[3][3] = .{ .wire = .{} };
+        state.block_grid[3][4] = .{ .wire = .{} };
+        state.block_grid[3][7] = .{ .wire = .{} };
+        state.block_grid[3][9] = .{ .wire = .{} };
+        state.block_grid[3][10] = .{
+            .repeater = block.Repeater.init(.Right, .two),
+        };
+        state.power_grid[3][10] = .{ .power = -15 };
+        state.block_grid[3][11] = .{ .block = .{} };
+        break :blk state;
     };
-    state.power_grid[1][9] = .{ .power = -15 };
-    state.block_grid[2][9] = .{ .block = .{} };
-    state.block_grid[3][2] = .{ .wire = .{} };
-    state.block_grid[3][3] = .{ .wire = .{} };
-    state.block_grid[3][4] = .{ .wire = .{} };
-    state.block_grid[3][7] = .{ .wire = .{} };
-    state.block_grid[3][9] = .{ .wire = .{} };
-    state.block_grid[3][10] = .{
-        .repeater = block.Repeater.init(.Right, .two),
-    };
-    state.power_grid[3][10] = .{ .power = -15 };
-    state.block_grid[3][11] = .{ .block = .{} };
 
     const inputs = [_]sim.Input{
         .empty,
@@ -58,83 +62,25 @@ pub fn main() !void {
         } },
     };
 
+    var ctlstate = ctl.CtlState{
+        .sim_state = state,
+        .cursor = .{0} ** 2,
+    };
+
     for (inputs) |input| {
-        state = try simulation.step(state, input, alloc);
-        try draw(state, input, alloc);
+        const ctlinput = .{ .step = input };
+        ctlstate = try controler.step(ctlstate, ctlinput, alloc);
+        try ctl.draw(ctlstate, alloc);
 
         std.debug.assert(arena.reset(.{ .free_all = {} }));
     }
-}
-
-fn print_repeat_ln(
-    writer: anytype,
-    comptime fmt: []const u8,
-    args: anytype,
-    times: usize,
-) !void {
-    var i = @as(usize, 0);
-    while (i < times) : (i += 1) {
-        try writer.print(fmt, args);
-    }
-    try writer.print("\n", .{});
-}
-
-fn print_input_ln(writer: anytype, input: sim.Input) !void {
-    try writer.print("= Input: ", .{});
-    switch (input) {
-        .empty => try writer.print("Step", .{}),
-        .putBlock => |i| {
-            try writer.print("Put .{s} at (y: {}, x: {})", .{
-                @tagName(i.block),
-                i.y,
-                i.x,
-            });
-        },
-    }
-    try writer.print("\n", .{});
-}
-
-fn draw(state: sim.State, input: sim.Input, alloc: std.mem.Allocator) !void {
-    const render = try sim.render(state, alloc);
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
-
-    try print_repeat_ln(stdout, "=", .{}, render[0].len * 4 + 1);
-
-    try print_input_ln(stdout, input);
-
-    try print_repeat_ln(stdout, "=", .{}, render[0].len * 4 + 1);
-
-    try stdout.print("+", .{});
-    try print_repeat_ln(stdout, "---+", .{}, render[0].len);
-
-    for (render) |row| {
-        try stdout.print("|", .{});
-        for (row) |x| {
-            try stdout.print("{s: ^3}|", .{x.up_row});
-        } else try stdout.print("\n", .{});
-
-        try stdout.print("|", .{});
-        for (row) |x| {
-            try stdout.print("{s: ^3}|", .{x.mid_row});
-        } else try stdout.print("\n", .{});
-
-        try stdout.print("|", .{});
-        for (row) |x| {
-            try stdout.print("{s: ^3}|", .{x.bot_row});
-        } else try stdout.print("\n", .{});
-
-        try stdout.print("+", .{});
-        try print_repeat_ln(stdout, "---+", .{}, render[0].len);
-    }
-    try bw.flush();
 }
 
 test "It compiles!" {
     std.testing.refAllDeclsRecursive(@This());
     std.testing.refAllDeclsRecursive(block);
     std.testing.refAllDeclsRecursive(sim);
+    std.testing.refAllDeclsRecursive(ctl);
 }
 
 test "lib_sim.counter" {
