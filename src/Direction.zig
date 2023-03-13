@@ -83,6 +83,16 @@ pub const DirectionEnum = enum(u3) {
     ) ?[2]Uint {
         return self.toDirection().inbounds(Uint, y, x, h, w);
     }
+
+    pub fn inbounds_arr(
+        self: DirectionEnum,
+        comptime Uint: type,
+        pos: [2]Uint,
+        h: Uint,
+        w: Uint,
+    ) ?[2]Uint {
+        return self.toDirection().inbounds_arr(Uint, pos, h, w);
+    }
 };
 
 pub const directions = [_]Direction{ UP, RIGHT, DOWN, LEFT };
@@ -106,6 +116,16 @@ pub fn inbounds(
         @intCast(usize, iy),
         @intCast(usize, ix),
     };
+}
+
+pub fn inbounds_arr(
+    self: Direction,
+    comptime Uint: type,
+    pos: [2]Uint,
+    h: Uint,
+    w: Uint,
+) ?[2]Uint {
+    return inbounds(self, Uint, pos[0], pos[1], h, w);
 }
 
 pub fn others(

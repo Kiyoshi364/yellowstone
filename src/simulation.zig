@@ -6,6 +6,10 @@ const lib_sim = @import("lib_sim");
 const block = @import("block.zig");
 const Block = block.Block;
 
+const Direction = @import("Direction.zig");
+const DirectionEnum = Direction.DirectionEnum;
+const directions = Direction.directions;
+
 const Power = @import("Power.zig");
 
 pub const simulation = lib_sim.Sandboxed(State, Input){
@@ -18,7 +22,7 @@ pub const State = struct {
     block_grid: [height][width]Block,
     power_grid: [height][width]Power,
 
-    const Pos = [2]usize;
+    pub const Pos = [2]usize;
 
     const BlockIter = struct {
         y: usize = 0,
@@ -73,10 +77,6 @@ pub const emptyState = @as(State, .{
     .power_grid = .{.{.{}} ** width} ** height,
 });
 
-const Direction = @import("Direction.zig");
-const DirectionEnum = Direction.DirectionEnum;
-const directions = Direction.directions;
-
 pub fn update(
     state: State,
     input: Input,
@@ -109,10 +109,9 @@ pub fn update(
                     // was the same.
                     // But we don't have this information
                     // (only what we will output now)
-                    if (b.facing().?.inbounds(
+                    if (b.facing().?.inbounds_arr(
                         usize,
-                        y,
-                        x,
+                        pos,
                         height,
                         width,
                     )) |front_pos| {
@@ -213,7 +212,7 @@ pub fn update(
             const rep = b.repeater;
             const back_dir = rep.facing.back();
             const curr_in: u1 =
-                if (back_dir.inbounds(usize, y, x, height, width)) |bpos|
+                if (back_dir.inbounds_arr(usize, pos, height, width)) |bpos|
             blk: {
                 const power = newstate.power_grid[bpos[0]][bpos[1]];
                 break :blk switch (power.power) {
