@@ -38,29 +38,6 @@ pub fn main() !void {
         break :blk state;
     };
 
-    const inputs = [_]sim.Input{
-        .{ .putBlock = .{
-            .y = 0,
-            .x = 0,
-            .block = .{ .source = .{} },
-        } },
-        .{ .putBlock = .{
-            .y = 0,
-            .x = 8,
-            .block = .{ .block = .{} },
-        } },
-        .{ .putBlock = .{
-            .y = 2,
-            .x = 4,
-            .block = .{ .block = .{} },
-        } },
-        .{ .putBlock = .{
-            .y = 3,
-            .x = 5,
-            .block = .{ .wire = .{} },
-        } },
-    };
-
     var ctlstate = ctl.CtlState{
         .sim_state = state,
         .cursor = .{0} ** 2,
@@ -74,9 +51,8 @@ pub fn main() !void {
     defer term.unconfig_term() catch unreachable;
 
     try ctl.draw(ctlstate, alloc);
-    var i = @as(usize, 0);
-    while (i < inputs.len) {
-        const ctlinput = try read_ctlinput(&stdin, inputs[i], &i) orelse {
+    while (true) {
+        const ctlinput = try read_ctlinput(&stdin) orelse {
             break;
         };
 
@@ -87,25 +63,21 @@ pub fn main() !void {
     }
 }
 
-fn read_ctlinput(
-    reader: anytype,
-    input: sim.Input,
-    i: *usize,
-) !?ctl.CtlInput {
+fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
     var buffer = @as([1]u8, undefined);
     var loop = true;
     return while (loop) {
         const size = try reader.read(&buffer);
         if (size == 0) continue;
         switch (buffer[0]) {
-            ' ' => {
-                i.* += 1;
-                break .{ .step = input };
-            },
+            ' ' => break .{ .step = .{} },
+            '\n' => break .{ .putBlock = .{} },
             'w' => break .{ .moveCursor = .Up },
             's' => break .{ .moveCursor = .Down },
             'a' => break .{ .moveCursor = .Left },
             'd' => break .{ .moveCursor = .Right },
+            'n' => break .{ .nextBlock = .{} },
+            'p' => break .{ .prevBlock = .{} },
             'q' => break null,
             else => {},
         }

@@ -39,8 +39,8 @@ pub const Delay = enum(u2) {
 };
 
 pub const CanonicalRepeater = struct {
-    facing: DirectionEnum,
-    delay: Delay,
+    facing: DirectionEnum = .Up,
+    delay: Delay = .one,
     /// Each bit of `memory` holds the state from it's "input"
     /// a number of ticks back:
     ///
@@ -238,7 +238,7 @@ test "CanonicalRepeater" {
 }
 
 pub const ImplicitDelayRepeater = struct {
-    facing: DirectionEnum,
+    facing: DirectionEnum = .Up,
 
     /// Please, look at CanonicalRepeater.memory for reference.
     /// This is the same but in a compressed form.
@@ -251,7 +251,7 @@ pub const ImplicitDelayRepeater = struct {
     /// - `0b001xx`: `.two`
     /// - `0b01xxx`: `.three`
     /// - `0b1xxxx`: `.four`
-    data: u5,
+    data: u5 = pack_delay_mem(.one, 0),
 
     pub fn init(facing: DirectionEnum, delay: Delay) ImplicitDelayRepeater {
         return init_mem(facing, delay, 0);
