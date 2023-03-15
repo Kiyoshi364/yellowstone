@@ -112,9 +112,9 @@ pub fn inbounds(
     const ix = @intCast(isize, x) + self.x;
     const y_is_ofb = iy < 0 or h <= iy;
     const x_is_ofb = ix < 0 or w <= ix;
-    return if (y_is_ofb or x_is_ofb) null else [_]usize{
-        @intCast(usize, iy),
-        @intCast(usize, ix),
+    return if (y_is_ofb or x_is_ofb) null else [_]Uint{
+        @intCast(Uint, iy),
+        @intCast(Uint, ix),
     };
 }
 
