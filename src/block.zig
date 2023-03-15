@@ -40,8 +40,8 @@ pub const Block = union(BlockType) {
             .wire => fmt(writer, "w", .{}),
             .block => fmt(writer, "B", .{}),
             .repeater => |r| fmt(writer, "r{c}{c}{c}", .{
-                "o^>v<x"[@enumToInt(r.facing)],
                 "1234"[@enumToInt(r.get_delay())],
+                "o^>v<x"[@enumToInt(r.facing)],
                 "0123456789abcdef"[r.get_memory()],
             }),
         };

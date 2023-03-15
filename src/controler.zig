@@ -13,19 +13,22 @@ const SimInput = sim.Input;
 const block = @import("block.zig");
 const Block = block.Block;
 const BlockType = block.BlockType;
+const Repeater = block.Repeater;
 
 pub const controler = lib_sim.Sandboxed(CtlState, CtlInput){
     .update = update,
 };
 
-const starting_block_state =
-    std.enums.directEnumArray(BlockType, Block, 0, .{
-    .empty = .{ .empty = .{} },
-    .source = .{ .source = .{} },
-    .wire = .{ .wire = .{} },
-    .block = .{ .block = .{} },
-    .repeater = .{ .repeater = .{} },
-});
+const starting_block_state = [_]Block{
+    .{ .empty = .{} },
+    .{ .source = .{} },
+    .{ .wire = .{} },
+    .{ .block = .{} },
+    .{ .repeater = Repeater.init(.Up, .one) },
+    .{ .repeater = Repeater.init(.Up, .two) },
+    .{ .repeater = Repeater.init(.Up, .three) },
+    .{ .repeater = Repeater.init(.Up, .four) },
+};
 
 pub const CtlState = struct {
     update_count: usize = 0,
@@ -33,7 +36,7 @@ pub const CtlState = struct {
     last_input: ?SimInput = null,
     cursor: [2]u8,
     block_state: @TypeOf(starting_block_state) = starting_block_state,
-    curr_block: @typeInfo(BlockType).Enum.tag_type = 0,
+    curr_block: usize = 0,
 
     const blks_len = @intCast(
         @typeInfo(BlockType).Enum.tag_type,
