@@ -331,11 +331,15 @@ pub fn render(
                 .block => @as(u8, 'B'),
                 .repeater => @as(u8, 'r'),
             };
+            const c_info = switch (b) {
+                .empty, .source, .wire, .block => @as(u8, ' '),
+                .repeater => |r| "1234"[@enumToInt(r.get_delay())],
+            };
             const char_dirs = @as(*const [6]u8, "o^>v<x");
-            var c_dirs = @as([6]u8, "      ".*);
+            var c_dirs = @as([5]u8, "     ".*);
             if (b.facing()) |facing| {
                 const i = @enumToInt(facing);
-                c_dirs[i] = char_dirs[i];
+                c_dirs[i % c_dirs.len] = char_dirs[i];
             } else {
                 // Empty
             }
@@ -344,13 +348,14 @@ pub fn render(
             const right = @enumToInt(DirectionEnum.Right);
             const down = @enumToInt(DirectionEnum.Down);
             const left = @enumToInt(DirectionEnum.Left);
-            // const below = @enumToInt(DirectionEnum.Below);
+            // const below = @enumToInt(DirectionEnum.Below) % c_dirs.len;
+            // std.debug.assert(above == below);
             canvas.*[y][x] = DrawBlock{
                 // .up_row = [3]u8{ c_dirs[above], c_dirs[up], ' ' },
                 .up_row = [3]u8{ ' ', c_dirs[up], ' ' },
                 .mid_row = [3]u8{ c_dirs[left], c_block, c_dirs[right] },
-                .bot_row = [3]u8{ c_power, c_dirs[down], ' ' },
-                // .bot_row = [3]u8{ c_power, c_dirs[down], c_dirs[below] },
+                .bot_row = [3]u8{ c_power, c_dirs[down], c_info },
+                // .bot_row = [3]u8{ c_power, c_dirs[down], c_info },
             };
         }
     }
