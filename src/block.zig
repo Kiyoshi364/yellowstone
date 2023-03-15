@@ -27,6 +27,24 @@ pub const Block = union(BlockType) {
         };
     }
 
+    pub fn nextRotate(self: Block) Block {
+        return switch (self) {
+            .empty, .source, .wire, .block => self,
+            .repeater => |r| .{
+                .repeater = r.with_facing(r.facing.next()),
+            },
+        };
+    }
+
+    pub fn prevRotate(self: Block) Block {
+        return switch (self) {
+            .empty, .source, .wire, .block => self,
+            .repeater => |r| .{
+                .repeater = r.with_facing(r.facing.prev()),
+            },
+        };
+    }
+
     pub fn format(
         block: Block,
         _: []const u8,

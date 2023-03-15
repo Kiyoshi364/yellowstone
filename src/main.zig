@@ -78,6 +78,8 @@ fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
             'd' => break .{ .moveCursor = .Right },
             'n' => break .{ .nextBlock = .{} },
             'p' => break .{ .prevBlock = .{} },
+            '.' => break .{ .nextRotate = .{} },
+            ',' => break .{ .prevRotate = .{} },
             'q' => break null,
             else => {},
         }

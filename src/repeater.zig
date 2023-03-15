@@ -89,6 +89,14 @@ pub const CanonicalRepeater = struct {
         };
     }
 
+    pub fn with_facing(r: CanonicalRepeater, newfacing: DirectionEnum) CanonicalRepeater {
+        return .{
+            .facing = newfacing,
+            .delay = r.delay,
+            .memory = r.memory,
+        };
+    }
+
     pub fn is_valid(r: CanonicalRepeater) bool {
         return ~r.delay.mask() & r.memory == 0;
     }
@@ -261,6 +269,13 @@ pub const ImplicitDelayRepeater = struct {
         return .{
             .facing = facing,
             .data = pack_delay_mem(delay, mem),
+        };
+    }
+
+    pub fn with_facing(r: ImplicitDelayRepeater, newfacing: DirectionEnum) ImplicitDelayRepeater {
+        return .{
+            .facing = newfacing,
+            .data = r.data,
         };
     }
 

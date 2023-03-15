@@ -53,6 +53,8 @@ pub const CtlInput = union(enum) {
     moveCursor: DirectionEnum,
     nextBlock: struct {},
     prevBlock: struct {},
+    nextRotate: struct {},
+    prevRotate: struct {},
 };
 
 pub fn update(
@@ -102,6 +104,10 @@ pub fn update(
             (newctl.curr_block +% 1) % CtlState.blks_len,
         .prevBlock => newctl.curr_block =
             (newctl.curr_block +% CtlState.blks_len -% 1) % CtlState.blks_len,
+        .nextRotate => newctl.block_state[newctl.curr_block] =
+            newctl.block_state[newctl.curr_block].nextRotate(),
+        .prevRotate => newctl.block_state[newctl.curr_block] =
+            newctl.block_state[newctl.curr_block].prevRotate(),
     }
     return newctl;
 }

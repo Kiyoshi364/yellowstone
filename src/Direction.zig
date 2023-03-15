@@ -31,6 +31,30 @@ pub const DirectionEnum = enum(u3) {
         break :blk ds;
     };
 
+    pub fn next(self: DirectionEnum) DirectionEnum {
+        return switch (self) {
+            // .Above => .Up,
+            .Up => .Right,
+            .Right => .Down,
+            .Down => .Left,
+            .Left => .Up,
+            // .Left => .Below,
+            // .Below => .Above,
+        };
+    }
+
+    pub fn prev(self: DirectionEnum) DirectionEnum {
+        return switch (self) {
+            // .Above => .Below,
+            // .Up => .Above,
+            .Up => .Left,
+            .Right => .Up,
+            .Down => .Right,
+            .Left => .Down,
+            // .Below => .Left,
+        };
+    }
+
     pub fn back(self: DirectionEnum) DirectionEnum {
         return switch (self) {
             // .Above => .Below,
