@@ -11,27 +11,27 @@ Note that `---` are optmized for [slides](https://github.com/maaslalani/slides)
 
 * Run:
   ```console
-  $ zig build run
+  zig build run
   ```
 
 * Build (executable is `zig-out/bin/yellowstone`):
   ```console
-  $ zig build
+  zig build
   ```
 
 * Run all tests:
   ```console
-  $ zig build test
+  zig build test
   ```
 
 ## Zig Compiler Version
 
 Note that zig is not released yet.
 
-This project is built using the following `zig version`:
+This project is being developed with the following `zig version`:
 ```console
 $ zig version
-0.11.0-dev.1800+c7f479c3c
+0.11.0-dev.2160+49d37e2d1
 ```
 
 Grabing from master or version `0.11.*` should work.
