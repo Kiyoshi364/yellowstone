@@ -1,4 +1,5 @@
 const std = @import("std");
+const isWindows = @import("builtin").os.tag == .windows;
 
 const lib_sim = @import("lib_sim");
 
@@ -71,7 +72,7 @@ fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
         if (size == 0) continue;
         switch (buffer[0]) {
             ' ' => break .{ .step = .{} },
-            '\n' => break .{ .putBlock = .{} },
+            '\r', '\n' => break .{ .putBlock = .{} },
             'w' => break .{ .moveCursor = .Up },
             's' => break .{ .moveCursor = .Down },
             'a' => break .{ .moveCursor = .Left },
@@ -86,7 +87,30 @@ fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
     } else unreachable;
 }
 
-const Term = struct {
+const Term = if (isWindows) WindowsTerm else LinuxTerm;
+
+const WindowsTerm = struct {
+    stdinHandle: std.os.windows.HANDLE,
+    old_inMode: std.os.windows.DWORD,
+    stdoutHandle: std.os.windows.HANDLE,
+    old_outMode: std.os.windows.DWORD,
+
+    fn unconfig_term(self: Term) !void {
+        const wink32 = std.os.windows.kernel32;
+
+        if (wink32.SetConsoleMode(self.stdinHandle, self.old_inMode) == 0) {
+            std.debug.print("{}\n", .{wink32.GetLastError()});
+            return error.SetConsoleModeError;
+        }
+
+        if (wink32.SetConsoleMode(self.stdinHandle, self.old_inMode) == 0) {
+            std.debug.print("{}\n", .{wink32.GetLastError()});
+            return error.SetConsoleModeError;
+        }
+    }
+};
+
+const LinuxTerm = struct {
     old_term: std.os.termios,
 
     fn unconfig_term(self: Term) !void {
@@ -96,14 +120,104 @@ const Term = struct {
 };
 
 fn config_term() !Term {
-    const fd = 0;
-    const old_term = try std.os.tcgetattr(fd);
-    var new_term = old_term;
-    new_term.lflag &= ~(std.os.linux.ICANON | std.os.linux.ECHO);
-    try std.os.tcsetattr(fd, .NOW, new_term);
-    return .{
-        .old_term = old_term,
-    };
+    if (isWindows) {
+        // References:
+        // https://learn.microsoft.com/en-us/windows/console/console-functions
+        // https://learn.microsoft.com/en-us/windows/console/getconsolemode
+        // https://learn.microsoft.com/en-us/windows/console/setconsolemode
+        const win = std.os.windows;
+        const wink32 = win.kernel32;
+
+        const stdinHandle = wink32.GetStdHandle(win.STD_INPUT_HANDLE) orelse {
+            std.debug.print("{}\n", .{wink32.GetLastError()});
+            return error.GetStdInHandle;
+        };
+
+        if (stdinHandle == win.INVALID_HANDLE_VALUE) {
+            std.debug.print("{}\n", .{wink32.GetLastError()});
+            return error.InvalidStdInHandle;
+        }
+
+        const inMode = blk: {
+            var inMode = @as(win.DWORD, 0);
+            if (wink32.GetConsoleMode(stdinHandle, &inMode) == 0) {
+                std.debug.print("{}\n", .{wink32.GetLastError()});
+                return error.GetConsoleModeError;
+            }
+            break :blk inMode;
+        };
+
+        const new_inMode = blk: {
+            const ENABLE_ECHO_INPUT = @as(win.DWORD, 0x0004);
+            // const ENABLE_INSERT_MODE = @as(win.DWORD, 0x0020);
+            const ENABLE_LINE_INPUT = @as(win.DWORD, 0x0002);
+            // const ENABLE_MOUSE_INPUT = @as(win.DWORD, 0x0010);
+            // const ENABLE_PROCESSED_INPUT = @as(win.DWORD, 0x0001);
+            // const ENABLE_QUICK_EDIT_MODE = @as(win.DWORD, 0x0040);
+            // const ENABLE_WINDOW_INPUT = @as(win.DWORD, 0x0008);
+            const ENABLE_VIRTUAL_TERMINAL_INPUT = @as(win.DWORD, 0x0200);
+
+            var new_inMode = inMode;
+            new_inMode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT);
+            new_inMode |= ENABLE_VIRTUAL_TERMINAL_INPUT;
+            break :blk new_inMode;
+        };
+
+        if (wink32.SetConsoleMode(stdinHandle, new_inMode) == 0) {
+            std.debug.print("{}\n", .{wink32.GetLastError()});
+            return error.SetConsoleModeError;
+        }
+
+        const stdoutHandle = wink32.GetStdHandle(win.STD_OUTPUT_HANDLE) orelse {
+            std.debug.print("{}\n", .{wink32.GetLastError()});
+            return error.GetStdInHandle;
+        };
+        if (stdoutHandle == win.INVALID_HANDLE_VALUE) {
+            std.debug.print("{}\n", .{wink32.GetLastError()});
+            return error.InvalidStdOutHandle;
+        }
+        const outMode = blk: {
+            var outMode = @as(win.DWORD, 0);
+            if (wink32.GetConsoleMode(stdoutHandle, &outMode) == 0) {
+                std.debug.print("{}\n", .{wink32.GetLastError()});
+                return error.GetConsoleModeError;
+            }
+            break :blk outMode;
+        };
+
+        const new_outMode = blk: {
+            const ENABLE_PROCESSED_OUTPUT = @as(win.DWORD, 0x0001);
+            // const ENABLE_WRAP_AT_EOL_OUTPUT = @as(win.DWORD, 0x0002);
+            const ENABLE_VIRTUAL_TERMINAL_PROCESSING = @as(win.DWORD, 0x0004);
+            // const DISABLE_NEWLINE_AUTO_RETURN = @as(win.DWORD, 0x0008);
+            // const ENABLE_LVB_GRID_WORLDWIDE = @as(win.DWORD, 0x0010);
+
+            var new_outMode = outMode;
+            new_outMode |= (ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+            break :blk new_outMode;
+        };
+
+        if (wink32.SetConsoleMode(stdoutHandle, new_outMode) == 0) {
+            std.debug.print("{}\n", .{wink32.GetLastError()});
+            return error.SetConsoleModeError;
+        }
+
+        return .{
+            .stdinHandle = stdinHandle,
+            .old_inMode = inMode,
+            .stdoutHandle = stdoutHandle,
+            .old_outMode = outMode,
+        };
+    } else {
+        const fd = 0;
+        const old_term = try std.os.tcgetattr(fd);
+        var new_term = old_term;
+        new_term.lflag &= ~(std.os.linux.ICANON | std.os.linux.ECHO);
+        try std.os.tcsetattr(fd, .NOW, new_term);
+        return .{
+            .old_term = old_term,
+        };
+    }
 }
 
 test "It compiles!" {

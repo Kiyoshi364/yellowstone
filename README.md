@@ -92,7 +92,7 @@ where:
 |Char|Action|
 |----|------|
 |`' '`|step|
-|`'\n'`|put selected block and step|
+|`'\r'`, `'\n'`|put selected block and step|
 |`'w'`|move cursor up|
 |`'s'`|move cursor down|
 |`'a'`|move cursor left|
