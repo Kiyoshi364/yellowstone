@@ -260,7 +260,10 @@ fn update_wire_or_block(
                 if (is_a_source) {
                     std.debug.assert(that_block == .source or
                         that_block == .block);
-                    this_power = Power.FROM_SOURCE_POWER.power;
+                    this_power = if (0 <= this_power)
+                        Power.FROM_SOURCE_POWER.power
+                    else
+                        this_power;
                 } else if (is_a_repeater) {
                     std.debug.assert(that_block == .repeater);
                     const is_on = that_block.repeater.is_on();
