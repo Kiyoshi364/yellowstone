@@ -95,7 +95,7 @@ A general tile is organized in this way:
 where:
 * `d`: is a direction (one of " x^>v<o")
   * Note: `x` and `o` are reserved for 3D implementation,
-  therefore unused
+  therefore currently unused
 * `c`: marks where the cursor is (one of " x")
 * `b`: which block is there
 * `p`: current power (one of " 12456789abcdef*")
