@@ -35,7 +35,7 @@ pub const CtlState = struct {
     update_count: usize = 0,
     sim_state: SimState,
     last_input: ?SimInput = null,
-    cursor: [2]u8,
+    cursor: [3]u8,
     block_state: @TypeOf(starting_block_state) = starting_block_state,
     curr_block: usize = 0,
 
@@ -78,8 +78,9 @@ pub fn update(
         },
         .putBlock => {
             const input = SimInput{ .putBlock = .{
-                .y = ctl.cursor[0],
-                .x = ctl.cursor[1],
+                .z = ctl.cursor[0],
+                .y = ctl.cursor[1],
+                .x = ctl.cursor[2],
                 .block = ctl.block_state[ctl.curr_block],
             } };
             newctl.sim_state =
@@ -95,7 +96,7 @@ pub fn update(
             if (de.inbounds_arr(
             u8,
             newctl.cursor,
-            [_]u8{ sim.height, sim.width },
+            [_]u8{ sim.depth, sim.height, sim.width },
         )) |npos|
             npos
         else
@@ -151,51 +152,55 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
 
-    try print_repeat_ln(stdout, "=", .{}, render[0].len * 4 + 1);
+    try print_repeat_ln(stdout, "=", .{}, render[0][0].len * 4 + 1);
 
     try print_input_ln(stdout, ctl.update_count, ctl.last_input);
     try stdout.print(
-        "= y: {d:0>3} x: {d:0>3}\n",
-        .{ ctl.cursor[0], ctl.cursor[1] },
+        "= z: {d:0>3} y: {d:0>3} x: {d:0>3}\n",
+        .{ ctl.cursor[0], ctl.cursor[1], ctl.cursor[2] },
     );
     try stdout.print(
         "= curr_block ({d}): {}\n",
         .{ ctl.curr_block, ctl.block_state[ctl.curr_block] },
     );
 
-    try print_repeat_ln(stdout, "=", .{}, render[0].len * 4 + 1);
+    try print_repeat_ln(stdout, "=", .{}, render[0][0].len * 4 + 1);
 
-    try stdout.print("+", .{});
-    try print_repeat_ln(stdout, "---+", .{}, render[0].len);
-
-    for (render, 0..) |row, j| {
-        try stdout.print("|", .{});
-        if (j == ctl.cursor[0]) {
-            for (row, 0..) |x, i| {
-                if (i == ctl.cursor[1]) {
-                    try stdout.print("{s: ^2}x|", .{x.up_row[0..2]});
-                } else {
-                    try stdout.print("{s: ^3}|", .{x.up_row});
-                }
-            } else try stdout.print("\n", .{});
-        } else {
-            for (row) |x| {
-                try stdout.print("{s: ^3}|", .{x.up_row});
-            } else try stdout.print("\n", .{});
-        }
-
-        try stdout.print("|", .{});
-        for (row) |x| {
-            try stdout.print("{s: ^3}|", .{x.mid_row});
-        } else try stdout.print("\n", .{});
-
-        try stdout.print("|", .{});
-        for (row) |x| {
-            try stdout.print("{s: ^3}|", .{x.bot_row});
-        } else try stdout.print("\n", .{});
-
+    for (render, 0..) |plane, k| {
         try stdout.print("+", .{});
-        try print_repeat_ln(stdout, "---+", .{}, render[0].len);
+        try print_repeat_ln(stdout, "---+", .{}, render[0][0].len);
+
+        for (plane, 0..) |row, j| {
+            try stdout.print("|", .{});
+            if (k == ctl.cursor[0] and j == ctl.cursor[1]) {
+                for (row, 0..) |x, i| {
+                    if (i == ctl.cursor[2]) {
+                        try stdout.print("{s: ^2}x|", .{x.up_row[0..2]});
+                    } else {
+                        try stdout.print("{s: ^3}|", .{x.up_row});
+                    }
+                } else try stdout.print("\n", .{});
+            } else {
+                for (row) |x| {
+                    try stdout.print("{s: ^3}|", .{x.up_row});
+                } else try stdout.print("\n", .{});
+            }
+
+            try stdout.print("|", .{});
+            for (row) |x| {
+                try stdout.print("{s: ^3}|", .{x.mid_row});
+            } else try stdout.print("\n", .{});
+
+            try stdout.print("|", .{});
+            for (row) |x| {
+                try stdout.print("{s: ^3}|", .{x.bot_row});
+            } else try stdout.print("\n", .{});
+
+            try stdout.print("+", .{});
+            try print_repeat_ln(stdout, "---+", .{}, row.len);
+        }
+        try stdout.print("+", .{});
+        try print_repeat_ln(stdout, "===+", .{}, plane[0].len);
     }
     try bw.flush();
 }

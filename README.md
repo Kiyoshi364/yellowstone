@@ -95,8 +95,6 @@ A general tile is organized in this way:
 ```
 where:
 * `d`: is a direction (one of " x^>v<o")
-  * Note: `x` and `o` are reserved for 3D implementation,
-  therefore currently unused
 * `c`: marks where the cursor is (one of " x")
 * `b`: which block is there
 * `p`: current power (one of " 12456789abcdef*")
@@ -117,6 +115,8 @@ where:
 |`'s'`|move cursor down|
 |`'a'`|move cursor left|
 |`'d'`|move cursor right|
+|`'z'`|move cursor above|
+|`'x'`|move cursor below|
 |`'n'`|select next block|
 |`'p'`|select prev block|
 |`'.'`|next rotate selected block|

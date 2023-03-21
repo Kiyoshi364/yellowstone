@@ -17,32 +17,32 @@ pub fn main() !void {
 
     const state = blk: {
         var state = sim.emptyState;
-        state.block_grid[0] = .{.{ .wire = .{} }} ** sim.width;
-        state.block_grid[2] = .{.{ .wire = .{} }} ** 8 ++
+        state.block_grid[1][0] = .{.{ .wire = .{} }} ** sim.width;
+        state.block_grid[1][2] = .{.{ .wire = .{} }} ** 8 ++
             .{.empty} ** (sim.width - 8);
-        state.block_grid[1][7] = .{ .wire = .{} };
-        state.block_grid[1][9] = .{
+        state.block_grid[1][1][7] = .{ .wire = .{} };
+        state.block_grid[1][1][9] = .{
             .repeater = block.Repeater.init(.Down, .one),
         };
-        state.power_grid[1][9] = .repeater;
-        state.block_grid[2][9] = .{ .block = .{} };
-        state.block_grid[3][2] = .{ .wire = .{} };
-        state.block_grid[3][3] = .{ .wire = .{} };
-        state.block_grid[3][4] = .{ .wire = .{} };
-        state.block_grid[3][7] = .{ .wire = .{} };
-        state.block_grid[3][9] = .{ .wire = .{} };
-        state.block_grid[3][10] = .{
+        state.power_grid[1][1][9] = .repeater;
+        state.block_grid[1][2][9] = .{ .block = .{} };
+        state.block_grid[1][3][2] = .{ .wire = .{} };
+        state.block_grid[1][3][3] = .{ .wire = .{} };
+        state.block_grid[1][3][4] = .{ .wire = .{} };
+        state.block_grid[1][3][7] = .{ .wire = .{} };
+        state.block_grid[1][3][9] = .{ .wire = .{} };
+        state.block_grid[1][3][10] = .{
             .repeater = block.Repeater.init(.Right, .two),
         };
-        state.power_grid[3][10] = .repeater;
-        state.block_grid[3][11] = .{ .block = .{} };
-        state.block_grid[5][0] = .{ .wire = .{} };
-        state.block_grid[5][1] = .{
+        state.power_grid[1][3][10] = .repeater;
+        state.block_grid[1][3][11] = .{ .block = .{} };
+        state.block_grid[1][5][0] = .{ .wire = .{} };
+        state.block_grid[1][5][1] = .{
             .negator = .{ .facing = .Right },
         };
-        state.power_grid[5][1] = .negator;
-        state.block_grid[6][0] = .{ .wire = .{} };
-        state.block_grid[6][1] = .{ .block = .{} };
+        state.power_grid[1][5][1] = .negator;
+        state.block_grid[1][6][0] = .{ .wire = .{} };
+        state.block_grid[1][6][1] = .{ .block = .{} };
         break :blk state;
     };
 
@@ -84,6 +84,8 @@ fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
             's' => break .{ .moveCursor = .Down },
             'a' => break .{ .moveCursor = .Left },
             'd' => break .{ .moveCursor = .Right },
+            'z' => break .{ .moveCursor = .Above },
+            'x' => break .{ .moveCursor = .Below },
             'n' => break .{ .nextBlock = .{} },
             'p' => break .{ .prevBlock = .{} },
             '.' => break .{ .nextRotate = .{} },
