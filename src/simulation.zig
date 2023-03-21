@@ -103,10 +103,10 @@ pub fn update(
                 .wire,
                 .block,
                 => {},
-                .repeater => {
+                .repeater, .negator => {
                     // Note: here should be a great place
-                    // to "do nothing" if repeater's output
-                    // was the same.
+                    // to "do nothing" if repeater's or negator's
+                    // output was the same.
                     // But we don't have this information
                     // (only what we will output now)
                     if (b.facing().?.inbounds_arr(
@@ -139,6 +139,7 @@ pub fn update(
                         std.debug.assert(r.is_valid());
                         break :blk Power.REPEATER_POWER;
                     },
+                    .negator => Power.NEGATOR_POWER,
                 };
                 for (directions) |d| {
                     if (d.inbounds(usize, i.y, i.x, height, width)) |npos| {
@@ -149,6 +150,7 @@ pub fn update(
                     .empty,
                     .source,
                     .repeater,
+                    .negator,
                     => false,
                     .wire,
                     .block,
@@ -205,6 +207,13 @@ pub fn update(
                     std.debug.assert(repeater_is_ok);
                     std.debug.assert(r.is_valid());
                 },
+                .negator => {
+                    const negator_is_ok = std.meta.eql(
+                        Power.NEGATOR_POWER,
+                        newstate.power_grid[y][x],
+                    );
+                    std.debug.assert(negator_is_ok);
+                },
             }
         }
     }
@@ -229,15 +238,55 @@ pub fn update(
                     Power.REPEATER_POWER.power => blk2: {
                         const prev_b_block =
                             state.block_grid[bpos[0]][bpos[1]];
-                        break :blk2 if (prev_b_block == .repeater)
-                            prev_b_block.repeater.next_out()
-                        else
-                            0;
+                        std.debug.assert(prev_b_block == .repeater);
+                        break :blk2 prev_b_block.repeater.next_out();
+                    },
+                    Power.NEGATOR_POWER.power => blk2: {
+                        const prev_b_block =
+                            state.block_grid[bpos[0]][bpos[1]];
+                        std.debug.assert(prev_b_block == .negator);
+                        break :blk2 prev_b_block.negator.next_out();
                     },
                     else => unreachable,
                 };
             } else 0;
             newstate.block_grid[y][x] = .{ .repeater = rep.shift(curr_in) };
+        }
+    }
+
+    { // For each negator, shift input
+        var block_it = State.BlockIter{};
+        while (block_it.next_pos()) |pos| {
+            const y = pos[0];
+            const x = pos[1];
+            const b = newstate.block_grid[y][x];
+            if (b != .negator) continue;
+            const neg = b.negator;
+            const back_dir = neg.facing.back();
+            const curr_in: u1 =
+                if (back_dir.inbounds_arr(usize, pos, height, width)) |bpos|
+            blk: {
+                const power = newstate.power_grid[bpos[0]][bpos[1]];
+                break :blk switch (power.power) {
+                    0 => 0,
+                    1...15 => 1,
+                    Power.SOURCE_POWER.power => 1,
+                    Power.REPEATER_POWER.power => blk2: {
+                        const prev_b_block =
+                            state.block_grid[bpos[0]][bpos[1]];
+                        std.debug.assert(prev_b_block == .repeater);
+                        break :blk2 prev_b_block.repeater.next_out();
+                    },
+                    Power.NEGATOR_POWER.power => blk2: {
+                        const prev_b_block =
+                            state.block_grid[bpos[0]][bpos[1]];
+                        std.debug.assert(prev_b_block == .negator);
+                        break :blk2 prev_b_block.negator.next_out();
+                    },
+                    else => unreachable,
+                };
+            } else 0;
+            newstate.block_grid[y][x] = .{ .negator = neg.shift(curr_in) };
         }
     }
     return newstate;
@@ -265,6 +314,8 @@ fn update_wire(
                     that_power == Power.SOURCE_POWER.power;
                 const is_a_repeater =
                     that_power == Power.REPEATER_POWER.power;
+                const is_a_negator =
+                    that_power == Power.NEGATOR_POWER.power;
                 if (is_a_source) {
                     std.debug.assert(that_block == .source or
                         that_block == .block);
@@ -280,6 +331,16 @@ fn update_wire(
                     );
                     if (is_on and is_facing_me) {
                         this_power = Power.FROM_REPEATER_POWER.power;
+                    }
+                } else if (is_a_negator) {
+                    std.debug.assert(that_block == .negator);
+                    const is_on = that_block.negator.is_on();
+                    const is_backing_me = std.meta.eql(
+                        d,
+                        that_block.facing().?.toDirection(),
+                    );
+                    if (is_on and !is_backing_me) {
+                        this_power = Power.FROM_SOURCE_POWER.power;
                     }
                 } else {
                     std.debug.print(
@@ -324,6 +385,8 @@ fn update_block(
                     that_power == Power.SOURCE_POWER.power;
                 const is_a_repeater =
                     that_power == Power.REPEATER_POWER.power;
+                const is_a_negator =
+                    that_power == Power.NEGATOR_POWER.power;
                 if (is_a_source) {
                     std.debug.assert(that_block == .source or
                         that_block == .block);
@@ -339,6 +402,16 @@ fn update_block(
                         that_block.facing().?.back().toDirection(),
                     );
                     if (is_on and is_facing_me) {
+                        this_power = Power.SOURCE_POWER.power;
+                    }
+                } else if (is_a_negator) {
+                    std.debug.assert(that_block == .negator);
+                    const is_on = that_block.negator.is_on();
+                    const is_backing_me = std.meta.eql(
+                        d,
+                        that_block.facing().?.toDirection(),
+                    );
+                    if (is_on and !is_backing_me) {
                         this_power = Power.SOURCE_POWER.power;
                     }
                 } else {
@@ -378,8 +451,15 @@ pub fn render(
             const c_power = if (power_index < char_powers.len)
                 char_powers[power_index]
             else blk: {
-                std.debug.assert(b == .repeater);
-                break :blk char_powers[b.repeater.get_memory()];
+                if (power_index == Power.REPEATER_POWER.to_index()) {
+                    std.debug.assert(b == .repeater);
+                    break :blk char_powers[b.repeater.get_memory()];
+                } else if (power_index == Power.NEGATOR_POWER.to_index()) {
+                    std.debug.assert(b == .negator);
+                    break :blk char_powers[b.negator.memory];
+                } else {
+                    unreachable;
+                }
             };
             const c_block = switch (b) {
                 .empty => @as(u8, ' '),
@@ -387,9 +467,10 @@ pub fn render(
                 .wire => @as(u8, 'w'),
                 .block => @as(u8, 'B'),
                 .repeater => @as(u8, 'r'),
+                .negator => @as(u8, 'n'),
             };
             const c_info = switch (b) {
-                .empty, .source, .wire, .block => @as(u8, ' '),
+                .empty, .source, .wire, .block, .negator => @as(u8, ' '),
                 .repeater => |r| "1234"[@enumToInt(r.get_delay())],
             };
             const char_dirs = @as(*const [6]u8, "o^>v<x");

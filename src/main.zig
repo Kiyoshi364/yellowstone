@@ -36,6 +36,18 @@ pub fn main() !void {
         };
         state.power_grid[3][10] = .{ .power = -15 };
         state.block_grid[3][11] = .{ .block = .{} };
+        state.block_grid[5][0] = .{ .wire = .{} };
+        state.block_grid[5][1] = .{
+            .negator = .{ .facing = .Right },
+        };
+        state.power_grid[5][1] = .{ .power = -14 };
+        state.block_grid[5][2] = .{ .block = .{} };
+        state.block_grid[5][3] = .{ .wire = .{} };
+        state.block_grid[6][0] = .{ .wire = .{} };
+        state.block_grid[6][2] = .{ .wire = .{} };
+        state.block_grid[7][0] = .{ .wire = .{} };
+        state.block_grid[7][1] = .{ .wire = .{} };
+        state.block_grid[7][2] = .{ .wire = .{} };
         break :blk state;
     };
 
