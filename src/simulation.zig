@@ -434,10 +434,21 @@ fn update_block(
                         this_power = power.SOURCE_POWER;
                     }
                 },
-                .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => {
-                    if (0 <= @enumToInt(this_power) and
-                        0 < @enumToInt(that_power))
-                    {
+                .empty => {},
+                .one => {
+                    std.debug.assert(@enumToInt(that_power) == 1);
+                    if (0 <= @enumToInt(this_power)) {
+                        std.debug.assert(that_block == .wire or
+                            that_block == .block);
+                        this_power = if (that_block == .block)
+                            power.BLOCK_OFF_POWER
+                        else
+                            power.BLOCK_ON_POWER;
+                    }
+                },
+                .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => {
+                    std.debug.assert(0 < @enumToInt(that_power));
+                    if (0 <= @enumToInt(this_power)) {
                         this_power = power.BLOCK_ON_POWER;
                     }
                 },
