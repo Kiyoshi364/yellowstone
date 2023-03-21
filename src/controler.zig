@@ -95,8 +95,7 @@ pub fn update(
             if (de.inbounds_arr(
             u8,
             newctl.cursor,
-            sim.height,
-            sim.width,
+            [_]u8{ sim.height, sim.width },
         )) |npos|
             npos
         else

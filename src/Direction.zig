@@ -102,20 +102,18 @@ pub const DirectionEnum = enum(u3) {
         comptime Uint: type,
         y: Uint,
         x: Uint,
-        h: Uint,
-        w: Uint,
+        bounds: [2]Uint,
     ) ?[2]Uint {
-        return self.toDirection().inbounds(Uint, y, x, h, w);
+        return self.toDirection().inbounds(Uint, y, x, bounds);
     }
 
     pub fn inbounds_arr(
         self: DirectionEnum,
         comptime Uint: type,
         pos: [2]Uint,
-        h: Uint,
-        w: Uint,
+        bounds: [2]Uint,
     ) ?[2]Uint {
-        return self.toDirection().inbounds_arr(Uint, pos, h, w);
+        return self.toDirection().inbounds_arr(Uint, pos, bounds);
     }
 };
 
@@ -126,12 +124,13 @@ pub fn inbounds(
     comptime Uint: type,
     y: Uint,
     x: Uint,
-    h: Uint,
-    w: Uint,
+    bounds: [2]Uint,
 ) ?[2]Uint {
     if (@typeInfo(Uint) != .Int) {
         @compileError("Expected int type, found '" ++ @typeName(Uint) ++ "'");
     }
+    const h = bounds[0];
+    const w = bounds[1];
     const iy = @intCast(isize, y) + self.y;
     const ix = @intCast(isize, x) + self.x;
     const y_is_ofb = iy < 0 or h <= iy;
@@ -146,10 +145,9 @@ pub fn inbounds_arr(
     self: Direction,
     comptime Uint: type,
     pos: [2]Uint,
-    h: Uint,
-    w: Uint,
+    bounds: [2]Uint,
 ) ?[2]Uint {
-    return inbounds(self, Uint, pos[0], pos[1], h, w);
+    return inbounds(self, Uint, pos[0], pos[1], bounds);
 }
 
 pub fn others(

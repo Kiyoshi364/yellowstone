@@ -19,6 +19,7 @@ pub const simulation = lib_sim.Sandboxed(State, Input){
 
 pub const width = 16;
 pub const height = width / 2;
+pub const bounds = [_]usize{ width, height };
 pub const State = struct {
     block_grid: [height][width]Block,
     power_grid: [height][width]Power,
@@ -113,8 +114,7 @@ pub fn update(
                     if (b.facing().?.inbounds_arr(
                         usize,
                         pos,
-                        height,
-                        width,
+                        bounds,
                     )) |front_pos| {
                         try mod_stack.append(front_pos);
                     } else {
@@ -132,8 +132,7 @@ pub fn update(
                         if (d.inbounds_arr(
                             usize,
                             pos,
-                            height,
-                            width,
+                            bounds,
                         )) |npos| {
                             try mod_stack.append(npos);
                         } else {
@@ -163,7 +162,7 @@ pub fn update(
                     .negator => power.NEGATOR_POWER,
                 };
                 for (directions) |d| {
-                    if (d.inbounds(usize, i.y, i.x, height, width)) |npos| {
+                    if (d.inbounds(usize, i.y, i.x, bounds)) |npos| {
                         try mod_stack.append(npos);
                     }
                 }
@@ -249,7 +248,7 @@ pub fn update(
             const rep = b.repeater;
             const back_dir = rep.facing.back();
             const curr_in: u1 =
-                if (back_dir.inbounds_arr(usize, pos, height, width)) |bpos|
+                if (back_dir.inbounds_arr(usize, pos, bounds)) |bpos|
             blk: {
                 const that_power = newstate.power_grid[bpos[0]][bpos[1]];
                 break :blk switch (that_power) {
@@ -285,7 +284,7 @@ pub fn update(
             const neg = b.negator;
             const back_dir = neg.facing.back();
             const curr_in: u1 =
-                if (back_dir.inbounds_arr(usize, pos, height, width)) |bpos|
+                if (back_dir.inbounds_arr(usize, pos, bounds)) |bpos|
             blk: {
                 const that_power = newstate.power_grid[bpos[0]][bpos[1]];
                 break :blk switch (that_power) {
@@ -323,7 +322,7 @@ fn update_wire(
     std.debug.assert(b == .wire);
     var this_power = Power.empty;
     for (directions) |d| {
-        if (d.inbounds(usize, y, x, height, width)) |npos| {
+        if (d.inbounds(usize, y, x, bounds)) |npos| {
             const ny = npos[0];
             const nx = npos[1];
             const that_power = newstate.power_grid[ny][nx];
@@ -381,7 +380,7 @@ fn update_wire(
     if (this_power != newstate.power_grid[y][x]) {
         newstate.power_grid[y][x] = this_power;
         for (directions) |d| {
-            if (d.inbounds(usize, y, x, height, width)) |npos| {
+            if (d.inbounds(usize, y, x, bounds)) |npos| {
                 try mod_stack.append(npos);
             }
         }
@@ -398,7 +397,7 @@ fn update_block(
     std.debug.assert(b == .block);
     var this_power = Power.empty;
     for (directions) |d| {
-        if (d.inbounds(usize, y, x, height, width)) |npos| {
+        if (d.inbounds(usize, y, x, bounds)) |npos| {
             const ny = npos[0];
             const nx = npos[1];
             const that_power = newstate.power_grid[ny][nx];
@@ -465,7 +464,7 @@ fn update_block(
     if (this_power != newstate.power_grid[y][x]) {
         newstate.power_grid[y][x] = this_power;
         for (directions) |d| {
-            if (d.inbounds(usize, y, x, height, width)) |npos| {
+            if (d.inbounds(usize, y, x, bounds)) |npos| {
                 try mod_stack.append(npos);
             }
         }
