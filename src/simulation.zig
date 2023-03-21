@@ -183,7 +183,14 @@ pub fn update(
                     );
                     std.debug.assert(source_is_ok);
                 },
-                .wire, .block => try update_wire_or_block(
+                .wire => try update_wire(
+                    &newstate,
+                    &mod_stack,
+                    y,
+                    x,
+                    b,
+                ),
+                .block => try update_block(
                     &newstate,
                     &mod_stack,
                     y,
@@ -236,14 +243,74 @@ pub fn update(
     return newstate;
 }
 
-fn update_wire_or_block(
+fn update_wire(
     newstate: *State,
     mod_stack: *std.ArrayList(State.Pos),
     y: usize,
     x: usize,
     b: Block,
 ) Allocator.Error!void {
-    std.debug.assert(b == .wire or b == .block);
+    std.debug.assert(b == .wire);
+    var this_power = @as(Power.PowerInt, 0);
+    for (directions) |d| {
+        if (d.inbounds(usize, y, x, height, width)) |npos| {
+            const ny = npos[0];
+            const nx = npos[1];
+            const that_power =
+                newstate.power_grid[ny][nx].power;
+            std.debug.assert(0 <= this_power);
+            if (that_power < 0) {
+                const that_block = newstate.block_grid[ny][nx];
+                const is_a_source =
+                    that_power == Power.SOURCE_POWER.power;
+                const is_a_repeater =
+                    that_power == Power.REPEATER_POWER.power;
+                if (is_a_source) {
+                    std.debug.assert(that_block == .source or
+                        that_block == .block);
+                    std.debug.assert(this_power <=
+                        Power.FROM_SOURCE_POWER.power);
+                    this_power = Power.FROM_SOURCE_POWER.power;
+                } else if (is_a_repeater) {
+                    std.debug.assert(that_block == .repeater);
+                    const is_on = that_block.repeater.is_on();
+                    const is_facing_me = std.meta.eql(
+                        d,
+                        that_block.facing().?.back().toDirection(),
+                    );
+                    if (is_on and is_facing_me) {
+                        this_power = Power.FROM_REPEATER_POWER.power;
+                    }
+                } else {
+                    std.debug.print(
+                        "this: (y: {}, x: {}) b: {} - that: (y: {}, x: {}) b:{} p: {}\n",
+                        .{ y, x, b, ny, nx, that_block, that_power },
+                    );
+                    unreachable;
+                }
+            } else if (this_power < that_power) {
+                this_power = that_power - 1;
+            }
+        }
+    }
+    if (this_power != newstate.power_grid[y][x].power) {
+        newstate.power_grid[y][x].power = this_power;
+        for (directions) |d| {
+            if (d.inbounds(usize, y, x, height, width)) |npos| {
+                try mod_stack.append(npos);
+            }
+        }
+    }
+}
+
+fn update_block(
+    newstate: *State,
+    mod_stack: *std.ArrayList(State.Pos),
+    y: usize,
+    x: usize,
+    b: Block,
+) Allocator.Error!void {
+    std.debug.assert(b == .block);
     var this_power = @as(Power.PowerInt, 0);
     for (directions) |d| {
         if (d.inbounds(usize, y, x, height, width)) |npos| {
@@ -272,12 +339,7 @@ fn update_wire_or_block(
                         that_block.facing().?.back().toDirection(),
                     );
                     if (is_on and is_facing_me) {
-                        if (b == .wire) {
-                            this_power = Power.FROM_REPEATER_POWER.power;
-                        } else {
-                            std.debug.assert(b == .block);
-                            this_power = Power.SOURCE_POWER.power;
-                        }
+                        this_power = Power.SOURCE_POWER.power;
                     }
                 } else {
                     std.debug.print(
@@ -293,14 +355,7 @@ fn update_wire_or_block(
             }
         }
     }
-    this_power = switch (b) {
-        .empty,
-        .source,
-        .repeater,
-        => unreachable,
-        .wire => this_power,
-        .block => @min(Power.BLOCK_MAX_VALUE, this_power),
-    };
+    this_power = @min(Power.BLOCK_MAX_VALUE, this_power);
     if (this_power != newstate.power_grid[y][x].power) {
         newstate.power_grid[y][x].power = this_power;
         for (directions) |d| {
