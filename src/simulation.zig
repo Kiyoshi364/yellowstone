@@ -103,9 +103,9 @@ pub fn update(
                 .wire,
                 .block,
                 => {},
-                .repeater, .negator => {
+                .repeater => {
                     // Note: here should be a great place
-                    // to "do nothing" if repeater's or negator's
+                    // to "do nothing" if repeater's
                     // output was the same.
                     // But we don't have this information
                     // (only what we will output now)
@@ -118,6 +118,26 @@ pub fn update(
                         try mod_stack.append(front_pos);
                     } else {
                         // Empty
+                    }
+                },
+                .negator => {
+                    // Note: here should be a great place
+                    // to "do nothing" if negator's
+                    // output was the same.
+                    // But we don't have this information
+                    // (only what we will output now)
+                    var buffer = @as([DirectionEnum.count]Direction, undefined);
+                    for (b.facing().?.back().toDirection().others(&buffer)) |d| {
+                        if (d.inbounds_arr(
+                            usize,
+                            pos,
+                            height,
+                            width,
+                        )) |npos| {
+                            try mod_stack.append(npos);
+                        } else {
+                            // Empty
+                        }
                     }
                 },
             }
