@@ -349,13 +349,12 @@ fn update_block(
                     unreachable;
                 }
             } else if (0 <= this_power and
-                this_power < that_power)
+                0 < that_power)
             {
-                this_power = that_power - 1;
+                this_power = Power.BLOCK_MAX_VALUE;
             }
         }
     }
-    this_power = @min(Power.BLOCK_MAX_VALUE, this_power);
     if (this_power != newstate.power_grid[y][x].power) {
         newstate.power_grid[y][x].power = this_power;
         for (directions) |d| {
