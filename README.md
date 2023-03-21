@@ -69,7 +69,7 @@ Note that: if it compiles, there is no need to patch `stdlib`.
 |Source|`'S'`|Redstone block|Distributes powers to adjacent tiles|-|
 |Wire|`'w'`|Redstone dust|Transport power to adjacent tiles|Always "broadcasts" power|
 |Block|`'B'`|Any Solid Block|Can be powered, limits power transportation|-|
-|Repeater|`'r'`|Repeater|Can be powered, limits power transportation|Cannot be "locked"|
+|Repeater|`'r'`|Repeater|Extends power transportation|Cannot be "locked"|
 |Negator|`'n'`|Redstone Torch|Negates power|-|
 
 ---
