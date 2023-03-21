@@ -10,7 +10,8 @@ const Direction = @import("Direction.zig");
 const DirectionEnum = Direction.DirectionEnum;
 const directions = Direction.directions;
 
-const Power = @import("Power.zig");
+const power = @import("power.zig");
+const Power = power.Power;
 
 pub const simulation = lib_sim.Sandboxed(State, Input){
     .update = update,
@@ -74,7 +75,7 @@ pub const Render = *const [height][width]DrawBlock;
 
 pub const emptyState = @as(State, .{
     .block_grid = .{.{.{ .empty = .{} }} ** width} ** height,
-    .power_grid = .{.{.{}} ** width} ** height,
+    .power_grid = .{.{.empty} ** width} ** height,
 });
 
 pub fn update(
@@ -150,16 +151,16 @@ pub fn update(
             .putBlock => |i| {
                 newstate.block_grid[i.y][i.x] = i.block;
                 newstate.power_grid[i.y][i.x] = switch (i.block) {
-                    .empty => Power.EMPTY_POWER,
-                    .source => Power.SOURCE_POWER,
+                    .empty => power.EMPTY_POWER,
+                    .source => power.SOURCE_POWER,
                     .wire,
                     .block,
-                    => Power.BLOCK_OFF_POWER,
+                    => power.BLOCK_OFF_POWER,
                     .repeater => |r| blk: {
                         std.debug.assert(r.is_valid());
-                        break :blk Power.REPEATER_POWER;
+                        break :blk power.REPEATER_POWER;
                     },
-                    .negator => Power.NEGATOR_POWER,
+                    .negator => power.NEGATOR_POWER,
                 };
                 for (directions) |d| {
                     if (d.inbounds(usize, i.y, i.x, height, width)) |npos| {
@@ -193,14 +194,14 @@ pub fn update(
             switch (b) {
                 .empty => {
                     const empty_is_ok = std.meta.eql(
-                        Power.EMPTY_POWER,
+                        power.EMPTY_POWER,
                         newstate.power_grid[y][x],
                     );
                     std.debug.assert(empty_is_ok);
                 },
                 .source => {
                     const source_is_ok = std.meta.eql(
-                        Power.SOURCE_POWER,
+                        power.SOURCE_POWER,
                         newstate.power_grid[y][x],
                     );
                     std.debug.assert(source_is_ok);
@@ -221,7 +222,7 @@ pub fn update(
                 ),
                 .repeater => |r| {
                     const repeater_is_ok = std.meta.eql(
-                        Power.REPEATER_POWER,
+                        power.REPEATER_POWER,
                         newstate.power_grid[y][x],
                     );
                     std.debug.assert(repeater_is_ok);
@@ -229,7 +230,7 @@ pub fn update(
                 },
                 .negator => {
                     const negator_is_ok = std.meta.eql(
-                        Power.NEGATOR_POWER,
+                        power.NEGATOR_POWER,
                         newstate.power_grid[y][x],
                     );
                     std.debug.assert(negator_is_ok);
@@ -250,24 +251,24 @@ pub fn update(
             const curr_in: u1 =
                 if (back_dir.inbounds_arr(usize, pos, height, width)) |bpos|
             blk: {
-                const power = newstate.power_grid[bpos[0]][bpos[1]];
-                break :blk switch (power.power) {
-                    0 => 0,
-                    1...15 => 1,
-                    Power.SOURCE_POWER.power => 1,
-                    Power.REPEATER_POWER.power => blk2: {
+                const that_power = newstate.power_grid[bpos[0]][bpos[1]];
+                break :blk switch (that_power) {
+                    .empty => 0,
+                    .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => 1,
+                    .source => 1,
+                    .repeater => blk2: {
                         const prev_b_block =
                             state.block_grid[bpos[0]][bpos[1]];
                         std.debug.assert(prev_b_block == .repeater);
                         break :blk2 prev_b_block.repeater.next_out();
                     },
-                    Power.NEGATOR_POWER.power => blk2: {
+                    .negator => blk2: {
                         const prev_b_block =
                             state.block_grid[bpos[0]][bpos[1]];
                         std.debug.assert(prev_b_block == .negator);
                         break :blk2 prev_b_block.negator.next_out();
                     },
-                    else => unreachable,
+                    _ => unreachable,
                 };
             } else 0;
             newstate.block_grid[y][x] = .{ .repeater = rep.shift(curr_in) };
@@ -286,18 +287,18 @@ pub fn update(
             const curr_in: u1 =
                 if (back_dir.inbounds_arr(usize, pos, height, width)) |bpos|
             blk: {
-                const power = newstate.power_grid[bpos[0]][bpos[1]];
-                break :blk switch (power.power) {
-                    0 => 0,
-                    1...15 => 1,
-                    Power.SOURCE_POWER.power => 1,
-                    Power.REPEATER_POWER.power => blk2: {
+                const that_power = newstate.power_grid[bpos[0]][bpos[1]];
+                break :blk switch (that_power) {
+                    .empty => 0,
+                    .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => 1,
+                    .source => 1,
+                    .repeater => blk2: {
                         const prev_b_block =
                             state.block_grid[bpos[0]][bpos[1]];
                         std.debug.assert(prev_b_block == .repeater);
                         break :blk2 prev_b_block.repeater.next_out();
                     },
-                    Power.NEGATOR_POWER.power => blk2: {
+                    .negator => blk2: {
                         const prev_b_block =
                             state.block_grid[bpos[0]][bpos[1]];
                         std.debug.assert(prev_b_block == .negator);
@@ -320,29 +321,23 @@ fn update_wire(
     b: Block,
 ) Allocator.Error!void {
     std.debug.assert(b == .wire);
-    var this_power = @as(Power.PowerInt, 0);
+    var this_power = Power.empty;
     for (directions) |d| {
         if (d.inbounds(usize, y, x, height, width)) |npos| {
             const ny = npos[0];
             const nx = npos[1];
-            const that_power =
-                newstate.power_grid[ny][nx].power;
-            std.debug.assert(0 <= this_power);
-            if (that_power < 0) {
-                const that_block = newstate.block_grid[ny][nx];
-                const is_a_source =
-                    that_power == Power.SOURCE_POWER.power;
-                const is_a_repeater =
-                    that_power == Power.REPEATER_POWER.power;
-                const is_a_negator =
-                    that_power == Power.NEGATOR_POWER.power;
-                if (is_a_source) {
+            const that_power = newstate.power_grid[ny][nx];
+            const that_block = newstate.block_grid[ny][nx];
+            std.debug.assert(0 <= @enumToInt(this_power));
+            switch (that_power) {
+                .source => {
                     std.debug.assert(that_block == .source or
                         that_block == .block);
-                    std.debug.assert(this_power <=
-                        Power.FROM_SOURCE_POWER.power);
-                    this_power = Power.FROM_SOURCE_POWER.power;
-                } else if (is_a_repeater) {
+                    std.debug.assert(@enumToInt(this_power) <=
+                        @enumToInt(power.FROM_SOURCE_POWER));
+                    this_power = power.FROM_SOURCE_POWER;
+                },
+                .repeater => {
                     std.debug.assert(that_block == .repeater);
                     const is_on = that_block.repeater.is_on();
                     const is_facing_me = std.meta.eql(
@@ -350,9 +345,10 @@ fn update_wire(
                         that_block.facing().?.back().toDirection(),
                     );
                     if (is_on and is_facing_me) {
-                        this_power = Power.FROM_REPEATER_POWER.power;
+                        this_power = power.FROM_REPEATER_POWER;
                     }
-                } else if (is_a_negator) {
+                },
+                .negator => {
                     std.debug.assert(that_block == .negator);
                     const is_on = that_block.negator.is_on();
                     const is_backing_me = std.meta.eql(
@@ -360,22 +356,30 @@ fn update_wire(
                         that_block.facing().?.toDirection(),
                     );
                     if (is_on and !is_backing_me) {
-                        this_power = Power.FROM_SOURCE_POWER.power;
+                        this_power = power.FROM_SOURCE_POWER;
                     }
-                } else {
+                },
+                .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => {
+                    std.debug.assert(0 <= @enumToInt(that_power));
+                    if (@enumToInt(this_power) < @enumToInt(that_power)) {
+                        this_power = @intToEnum(
+                            Power,
+                            @enumToInt(that_power) - 1,
+                        );
+                    }
+                },
+                _ => {
                     std.debug.print(
                         "this: (y: {}, x: {}) b: {} - that: (y: {}, x: {}) b:{} p: {}\n",
                         .{ y, x, b, ny, nx, that_block, that_power },
                     );
                     unreachable;
-                }
-            } else if (this_power < that_power) {
-                this_power = that_power - 1;
+                },
             }
         }
     }
-    if (this_power != newstate.power_grid[y][x].power) {
-        newstate.power_grid[y][x].power = this_power;
+    if (this_power != newstate.power_grid[y][x]) {
+        newstate.power_grid[y][x] = this_power;
         for (directions) |d| {
             if (d.inbounds(usize, y, x, height, width)) |npos| {
                 try mod_stack.append(npos);
@@ -392,29 +396,23 @@ fn update_block(
     b: Block,
 ) Allocator.Error!void {
     std.debug.assert(b == .block);
-    var this_power = @as(Power.PowerInt, 0);
+    var this_power = Power.empty;
     for (directions) |d| {
         if (d.inbounds(usize, y, x, height, width)) |npos| {
             const ny = npos[0];
             const nx = npos[1];
-            const that_power =
-                newstate.power_grid[ny][nx].power;
-            if (that_power < 0) {
-                const that_block = newstate.block_grid[ny][nx];
-                const is_a_source =
-                    that_power == Power.SOURCE_POWER.power;
-                const is_a_repeater =
-                    that_power == Power.REPEATER_POWER.power;
-                const is_a_negator =
-                    that_power == Power.NEGATOR_POWER.power;
-                if (is_a_source) {
+            const that_power = newstate.power_grid[ny][nx];
+            const that_block = newstate.block_grid[ny][nx];
+            switch (that_power) {
+                .source => {
                     std.debug.assert(that_block == .source or
                         that_block == .block);
-                    this_power = if (0 <= this_power)
-                        Power.FROM_SOURCE_POWER.power
+                    this_power = if (0 <= @enumToInt(this_power))
+                        power.FROM_SOURCE_POWER
                     else
                         this_power;
-                } else if (is_a_repeater) {
+                },
+                .repeater => {
                     std.debug.assert(that_block == .repeater);
                     const is_on = that_block.repeater.is_on();
                     const is_facing_me = std.meta.eql(
@@ -422,9 +420,10 @@ fn update_block(
                         that_block.facing().?.back().toDirection(),
                     );
                     if (is_on and is_facing_me) {
-                        this_power = Power.SOURCE_POWER.power;
+                        this_power = power.SOURCE_POWER;
                     }
-                } else if (is_a_negator) {
+                },
+                .negator => {
                     std.debug.assert(that_block == .negator);
                     const is_on = that_block.negator.is_on();
                     const is_backing_me = std.meta.eql(
@@ -432,24 +431,28 @@ fn update_block(
                         that_block.facing().?.toDirection(),
                     );
                     if (is_on and !is_backing_me) {
-                        this_power = Power.SOURCE_POWER.power;
+                        this_power = power.SOURCE_POWER;
                     }
-                } else {
+                },
+                .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => {
+                    if (0 <= @enumToInt(this_power) and
+                        0 < @enumToInt(that_power))
+                    {
+                        this_power = power.BLOCK_ON_POWER;
+                    }
+                },
+                _ => {
                     std.debug.print(
                         "this: (y: {}, x: {}) b: {} - that: (y: {}, x: {}) b:{} p: {}\n",
                         .{ y, x, b, ny, nx, that_block, that_power },
                     );
                     unreachable;
-                }
-            } else if (0 <= this_power and
-                0 < that_power)
-            {
-                this_power = Power.BLOCK_MAX_VALUE;
+                },
             }
         }
     }
-    if (this_power != newstate.power_grid[y][x].power) {
-        newstate.power_grid[y][x].power = this_power;
+    if (this_power != newstate.power_grid[y][x]) {
+        newstate.power_grid[y][x] = this_power;
         for (directions) |d| {
             if (d.inbounds(usize, y, x, height, width)) |npos| {
                 try mod_stack.append(npos);
@@ -471,10 +474,10 @@ pub fn render(
             const c_power = if (power_index < char_powers.len)
                 char_powers[power_index]
             else blk: {
-                if (power_index == Power.REPEATER_POWER.to_index()) {
+                if (power_index == power.REPEATER_POWER.to_index()) {
                     std.debug.assert(b == .repeater);
                     break :blk char_powers[b.repeater.get_memory()];
-                } else if (power_index == Power.NEGATOR_POWER.to_index()) {
+                } else if (power_index == power.NEGATOR_POWER.to_index()) {
                     std.debug.assert(b == .negator);
                     break :blk char_powers[b.negator.memory];
                 } else {

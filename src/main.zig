@@ -24,7 +24,7 @@ pub fn main() !void {
         state.block_grid[1][9] = .{
             .repeater = block.Repeater.init(.Down, .one),
         };
-        state.power_grid[1][9] = .{ .power = -15 };
+        state.power_grid[1][9] = .repeater;
         state.block_grid[2][9] = .{ .block = .{} };
         state.block_grid[3][2] = .{ .wire = .{} };
         state.block_grid[3][3] = .{ .wire = .{} };
@@ -34,13 +34,13 @@ pub fn main() !void {
         state.block_grid[3][10] = .{
             .repeater = block.Repeater.init(.Right, .two),
         };
-        state.power_grid[3][10] = .{ .power = -15 };
+        state.power_grid[3][10] = .repeater;
         state.block_grid[3][11] = .{ .block = .{} };
         state.block_grid[5][0] = .{ .wire = .{} };
         state.block_grid[5][1] = .{
             .negator = .{ .facing = .Right },
         };
-        state.power_grid[5][1] = .{ .power = -14 };
+        state.power_grid[5][1] = .negator;
         state.block_grid[6][0] = .{ .wire = .{} };
         state.block_grid[6][1] = .{ .block = .{} };
         break :blk state;
