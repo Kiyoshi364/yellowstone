@@ -152,21 +152,10 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
 
-    try print_repeat_ln(stdout, "=", .{}, render[0][0].len * 4 + 1);
-
-    try print_input_ln(stdout, ctl.update_count, ctl.last_input);
-    try stdout.print(
-        "= z: {d:0>3} y: {d:0>3} x: {d:0>3}\n",
-        .{ ctl.cursor[0], ctl.cursor[1], ctl.cursor[2] },
-    );
-    try stdout.print(
-        "= curr_block ({d}): {}\n",
-        .{ ctl.curr_block, ctl.block_state[ctl.curr_block] },
-    );
-
-    try print_repeat_ln(stdout, "=", .{}, render[0][0].len * 4 + 1);
-
     for (render, 0..) |plane, k| {
+        try stdout.print("+", .{});
+        try print_repeat_ln(stdout, "===+", .{}, plane[0].len);
+
         try stdout.print("+", .{});
         try print_repeat_ln(stdout, "---+", .{}, render[0][0].len);
 
@@ -199,8 +188,21 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
             try stdout.print("+", .{});
             try print_repeat_ln(stdout, "---+", .{}, row.len);
         }
-        try stdout.print("+", .{});
-        try print_repeat_ln(stdout, "===+", .{}, plane[0].len);
     }
+
+    try print_repeat_ln(stdout, "=", .{}, render[0][0].len * 4 + 1);
+
+    try print_input_ln(stdout, ctl.update_count, ctl.last_input);
+    try stdout.print(
+        "= z: {d:0>3} y: {d:0>3} x: {d:0>3}\n",
+        .{ ctl.cursor[0], ctl.cursor[1], ctl.cursor[2] },
+    );
+    try stdout.print(
+        "= curr_block ({d}): {}\n",
+        .{ ctl.curr_block, ctl.block_state[ctl.curr_block] },
+    );
+
+    try print_repeat_ln(stdout, "=", .{}, render[0][0].len * 4 + 1);
+
     try bw.flush();
 }
