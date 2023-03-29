@@ -98,6 +98,11 @@ fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
 
 const Term = if (isWindows) WindowsTerm else LinuxTerm;
 
+extern "kernel32" fn SetConsoleMode(
+    in_hConsoleHandle: std.os.windows.HANDLE,
+    in_dwMode: std.os.windows.DWORD,
+) callconv(std.os.windows.WINAPI) std.os.windows.BOOL;
+
 const WindowsTerm = struct {
     stdinHandle: std.os.windows.HANDLE,
     old_inMode: std.os.windows.DWORD,
@@ -107,12 +112,12 @@ const WindowsTerm = struct {
     fn unconfig_term(self: Term) !void {
         const wink32 = std.os.windows.kernel32;
 
-        if (wink32.SetConsoleMode(self.stdinHandle, self.old_inMode) == 0) {
+        if (SetConsoleMode(self.stdinHandle, self.old_inMode) == 0) {
             std.debug.print("{}\n", .{wink32.GetLastError()});
             return error.SetConsoleModeError;
         }
 
-        if (wink32.SetConsoleMode(self.stdinHandle, self.old_inMode) == 0) {
+        if (SetConsoleMode(self.stdinHandle, self.old_inMode) == 0) {
             std.debug.print("{}\n", .{wink32.GetLastError()});
             return error.SetConsoleModeError;
         }
@@ -172,7 +177,7 @@ fn config_term() !Term {
             break :blk new_inMode;
         };
 
-        if (wink32.SetConsoleMode(stdinHandle, new_inMode) == 0) {
+        if (SetConsoleMode(stdinHandle, new_inMode) == 0) {
             std.debug.print("{}\n", .{wink32.GetLastError()});
             return error.SetConsoleModeError;
         }
@@ -206,7 +211,7 @@ fn config_term() !Term {
             break :blk new_outMode;
         };
 
-        if (wink32.SetConsoleMode(stdoutHandle, new_outMode) == 0) {
+        if (SetConsoleMode(stdoutHandle, new_outMode) == 0) {
             std.debug.print("{}\n", .{wink32.GetLastError()});
             return error.SetConsoleModeError;
         }

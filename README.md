@@ -24,7 +24,6 @@ Note that `---` are optmized for [slides](https://github.com/maaslalani/slides)
   zig build test
   ```
 
----
 ## Zig Caveats
 
 ### Zig Compiler Version
@@ -41,22 +40,6 @@ Grabing from master or version `0.11.*` should work.
 If not, following compiler errors shouldn't be hard.
 
 See: ([downloads page](https:ziglang.org/download))
-
-### Compiling for Windows
-
-At the version stated previously,
-the `std.os.windows.kernel32` library
-does not export all available functions.
-So, maybe you will need to patch a file in `stdlib`.
-
-Look for a function called `SetConsoleMode` in the file
-`zig/lib/std/os/windows/kernel32.zig`.
-If the function is not there, append the following line
-```zig
-pub extern "kernel32" fn SetConsoleMode(in_hConsoleHandle: HANDLE, in_dwMode: DWORD) callconv(WINAPI) BOOL;
-```
-
-Note that: if it compiles, there is no need to patch `stdlib`.
 
 ---
 # Simulation explanation
