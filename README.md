@@ -59,13 +59,13 @@ See: ([downloads page](https:ziglang.org/download))
 ## Terminal Rendering
 
 Each tile is rendered as a 3x3 text (ignoring tile boundaries).
-A tiles examples:
+Some tiles examples:
 ```console
-+---+---+---+---+---+---+
-|   |   |   |  x|   |   |
-|   | S | w | w | B | r>|
-|   |*  |f  |e  |1  |1 1|
-+---+---+---+---+---+---+
++---+---+---+---+---+---+---+
+|   |   |   |  x|   |   | ^ |
+|   | S | w | w | B | r>| n |
+|   |*  |f  |e  |1  |1 1|1  |
++---+---+---+---+---+---+---+
 ```
 
 A general tile is organized in this way:
@@ -83,6 +83,7 @@ where:
 * `p`: current power (one of " 12456789abcdef*")
   * `*` means that it is a source
   * for Repeater is its memory (related to delay)
+  * for Negator is input that was read
 * `i`: information
   * for Repeater is its delay (one of "1234")
 
