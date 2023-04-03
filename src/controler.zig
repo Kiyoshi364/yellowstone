@@ -147,22 +147,32 @@ fn print_input_ln(writer: anytype, update_count: usize, m_input: ?sim.Input) !vo
 
 pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
     const state = ctl.sim_state;
-    const render = try sim.render(state, alloc);
     const stdout_file = std.io.getStdOut().writer();
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
 
-    for (render, 0..) |plane, k| {
+    const line_width = state.block_grid[0][0].len;
+
+    const line_buffer = try alloc.alloc(sim.DrawBlock, line_width);
+    defer alloc.free(line_buffer);
+
+    for (state.block_grid, 0..) |plane, k| {
         try stdout.print("+", .{});
-        try print_repeat_ln(stdout, "===+", .{}, plane[0].len);
+        try print_repeat_ln(stdout, "===+", .{}, line_width);
 
         try stdout.print("+", .{});
-        try print_repeat_ln(stdout, "---+", .{}, render[0][0].len);
+        try print_repeat_ln(stdout, "---+", .{}, line_width);
 
         for (plane, 0..) |row, j| {
+            for (row, 0..) |b, i| {
+                const this_power = state.power_grid[k][j][i];
+                line_buffer[i] = sim.render_block(b, this_power);
+            }
+
             try stdout.print("|", .{});
             if (k == ctl.cursor[0] and j == ctl.cursor[1]) {
-                for (row, 0..) |x, i| {
+                for (row, 0..) |_, i| {
+                    const x = line_buffer[i];
                     if (i == ctl.cursor[2]) {
                         try stdout.print("{s: ^2}x|", .{x.up_row[0..2]});
                     } else {
@@ -170,27 +180,30 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
                     }
                 } else try stdout.print("\n", .{});
             } else {
-                for (row) |x| {
+                for (row, 0..) |_, i| {
+                    const x = line_buffer[i];
                     try stdout.print("{s: ^3}|", .{x.up_row});
                 } else try stdout.print("\n", .{});
             }
 
             try stdout.print("|", .{});
-            for (row) |x| {
+            for (row, 0..) |_, i| {
+                const x = line_buffer[i];
                 try stdout.print("{s: ^3}|", .{x.mid_row});
             } else try stdout.print("\n", .{});
 
             try stdout.print("|", .{});
-            for (row) |x| {
+            for (row, 0..) |_, i| {
+                const x = line_buffer[i];
                 try stdout.print("{s: ^3}|", .{x.bot_row});
             } else try stdout.print("\n", .{});
 
             try stdout.print("+", .{});
-            try print_repeat_ln(stdout, "---+", .{}, row.len);
+            try print_repeat_ln(stdout, "---+", .{}, line_width);
         }
     }
 
-    try print_repeat_ln(stdout, "=", .{}, render[0][0].len * 4 + 1);
+    try print_repeat_ln(stdout, "=", .{}, line_width * 4 + 1);
 
     try print_input_ln(stdout, ctl.update_count, ctl.last_input);
     try stdout.print(
@@ -202,7 +215,7 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
         .{ ctl.curr_block, ctl.block_state[ctl.curr_block] },
     );
 
-    try print_repeat_ln(stdout, "=", .{}, render[0][0].len * 4 + 1);
+    try print_repeat_ln(stdout, "=", .{}, line_width * 4 + 1);
 
     try bw.flush();
 }
