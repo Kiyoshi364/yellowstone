@@ -60,7 +60,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const test_lib_sim_step = b.step("test_lib_sim", "Run unit tests for lib_sim");
-    test_lib_sim_step.dependOn(&exe_tests_lib_sim.step);
+    test_lib_sim_step.dependOn(&exe_tests_lib_sim.run().step);
 
     const exe_tests_main = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
@@ -70,6 +70,6 @@ pub fn build(b: *std.Build) void {
     exe_tests_main.addModule("lib_sim", sim_module);
 
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&exe_tests_main.step);
+    test_step.dependOn(&exe_tests_main.run().step);
     test_step.dependOn(test_lib_sim_step);
 }
