@@ -31,11 +31,42 @@ const starting_block_state = [_]Block{
     .{ .negator = .{} },
 };
 
+const Camera = struct {
+    pos: SimState.Pos = .{ 0, 0, 0 },
+    dim: [2]usize = .{ 4, 8 },
+
+    fn is_cursor_inside(self: Camera, cursor: [3]u8) bool {
+        return (self.pos[0] <= cursor[0] and
+            cursor[0] < self.pos[0] + 1) and
+            (self.pos[1] <= cursor[1] and
+            cursor[1] < self.pos[1] + self.dim[0]) and
+            (self.pos[2] <= cursor[2] and
+            cursor[2] < self.pos[2] + self.dim[1]);
+    }
+
+    fn mut_follow_cursor(
+        self: *Camera,
+        cursor: [3]u8,
+        de: DirectionEnum,
+    ) void {
+        if (self.is_cursor_inside(cursor)) {
+            // Empty
+        } else {
+            self.*.pos = de.inbounds_arr(
+                usize,
+                self.pos,
+                .{ sim.depth, sim.height, sim.width },
+            ).?;
+        }
+    }
+};
+
 pub const CtlState = struct {
     update_count: usize = 0,
     sim_state: SimState,
     last_input: ?SimInput = null,
     cursor: [3]u8,
+    camera: Camera = .{},
     block_state: @TypeOf(starting_block_state) = starting_block_state,
     curr_block: usize = 0,
 
@@ -56,6 +87,48 @@ pub const CtlInput = union(enum) {
     prevBlock: struct {},
     nextRotate: struct {},
     prevRotate: struct {},
+};
+
+const DirPosIter = struct {
+    const Pos = SimState.Pos;
+
+    dir: DirectionEnum,
+    bounds: Pos,
+    offset: ?Pos,
+    count: usize,
+
+    pub fn init(
+        dir: DirectionEnum,
+        bounds: Pos,
+        offset: Pos,
+        count: usize,
+    ) DirPosIter {
+        return .{
+            .dir = dir,
+            .bounds = bounds,
+            .offset = offset,
+            .count = count,
+        };
+    }
+
+    pub fn next_m_pos(self: *DirPosIter) ??Pos {
+        if (self.count > 0) {
+            self.count -= 1;
+            const ret_pos = self.offset;
+            if (self.offset) |pos| {
+                self.offset = self.dir.inbounds_arr(
+                    @TypeOf(pos[0]),
+                    pos,
+                    self.bounds,
+                );
+            } else {
+                // Empty
+            }
+            return ret_pos;
+        } else {
+            return @as(??Pos, null);
+        }
+    }
 };
 
 pub fn update(
@@ -92,15 +165,14 @@ pub fn update(
             newctl.update_count = ctl.update_count +| 1;
             newctl.last_input = input;
         },
-        .moveCursor => |de| newctl.cursor =
-            if (de.inbounds_arr(
+        .moveCursor => |de| if (de.inbounds_arr(
             u8,
             newctl.cursor,
             [_]u8{ sim.depth, sim.height, sim.width },
-        )) |npos|
-            npos
-        else
-            newctl.cursor,
+        )) |npos| {
+            newctl.cursor = npos;
+            newctl.camera.mut_follow_cursor(newctl.cursor, de);
+        },
         .nextBlock => newctl.curr_block =
             (newctl.curr_block +% 1) % CtlState.blks_len,
         .prevBlock => newctl.curr_block =
@@ -151,64 +223,102 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
     var bw = std.io.bufferedWriter(stdout_file);
     const stdout = bw.writer();
 
-    const line_width = state.block_grid[0][0].len;
+    const camera = ctl.camera;
+    const line_width = camera.dim[1];
 
     const line_buffer = try alloc.alloc(sim.DrawBlock, line_width);
     defer alloc.free(line_buffer);
 
-    for (state.block_grid, 0..) |plane, k| {
-        try stdout.print("+", .{});
-        try print_repeat_ln(stdout, "===+", .{}, line_width);
+    var screen_down_iter = DirPosIter.init(
+        DirectionEnum.Down,
+        .{ sim.depth, sim.height, sim.width },
+        camera.pos,
+        camera.dim[0],
+    );
 
-        try stdout.print("+", .{});
-        try print_repeat_ln(stdout, "---+", .{}, line_width);
+    try stdout.print("+", .{});
+    try print_repeat_ln(stdout, "---+", .{}, line_width);
 
-        for (plane, 0..) |row, j| {
-            for (row, 0..) |b, i| {
-                const this_power = state.power_grid[k][j][i];
-                line_buffer[i] = sim.render_block(b, this_power);
+    while (screen_down_iter.next_m_pos()) |m_pos| {
+        if (m_pos) |pos| {
+            { // build line_buffer
+                var screen_right_iter = DirPosIter.init(
+                    DirectionEnum.Right,
+                    .{ sim.depth, sim.height, sim.width },
+                    pos,
+                    camera.dim[1],
+                );
+
+                var i = @as(usize, 0);
+                while (screen_right_iter.next_m_pos()) |m_lpos| : (i += 1) {
+                    line_buffer[i] =
+                        if (m_lpos) |lpos|
+                    blk: {
+                        const b = state.block_grid[lpos[0]][lpos[1]][lpos[2]];
+                        const this_power = state.power_grid[lpos[0]][lpos[1]][lpos[2]];
+                        break :blk sim.render_block(b, this_power);
+                    } else .{
+                        .up_row = "***".*,
+                        .mid_row = "***".*,
+                        .bot_row = "***".*,
+                    };
+                }
             }
 
             try stdout.print("|", .{});
-            if (k == ctl.cursor[0] and j == ctl.cursor[1]) {
-                for (row, 0..) |_, i| {
-                    const x = line_buffer[i];
-                    if (i == ctl.cursor[2]) {
+            if (pos[0] == ctl.cursor[0] and pos[1] == ctl.cursor[1]) {
+                for (line_buffer, 0..) |x, i| {
+                    if (pos[2] + i == ctl.cursor[2]) {
                         try stdout.print("{s: ^2}x|", .{x.up_row[0..2]});
                     } else {
                         try stdout.print("{s: ^3}|", .{x.up_row});
                     }
                 } else try stdout.print("\n", .{});
             } else {
-                for (row, 0..) |_, i| {
-                    const x = line_buffer[i];
+                for (line_buffer) |x| {
                     try stdout.print("{s: ^3}|", .{x.up_row});
                 } else try stdout.print("\n", .{});
             }
 
             try stdout.print("|", .{});
-            for (row, 0..) |_, i| {
-                const x = line_buffer[i];
+            for (line_buffer) |x| {
                 try stdout.print("{s: ^3}|", .{x.mid_row});
             } else try stdout.print("\n", .{});
 
             try stdout.print("|", .{});
-            for (row, 0..) |_, i| {
-                const x = line_buffer[i];
+            for (line_buffer) |x| {
                 try stdout.print("{s: ^3}|", .{x.bot_row});
             } else try stdout.print("\n", .{});
+        } else {
+            try stdout.print("|", .{});
+            try print_repeat_ln(stdout, "***|", .{}, line_width);
 
-            try stdout.print("+", .{});
-            try print_repeat_ln(stdout, "---+", .{}, line_width);
+            try stdout.print("|", .{});
+            try print_repeat_ln(stdout, "***|", .{}, line_width);
+
+            try stdout.print("|", .{});
+            try print_repeat_ln(stdout, "***|", .{}, line_width);
         }
+
+        try stdout.print("+", .{});
+        try print_repeat_ln(stdout, "---+", .{}, line_width);
     }
 
     try print_repeat_ln(stdout, "=", .{}, line_width * 4 + 1);
 
     try print_input_ln(stdout, ctl.update_count, ctl.last_input);
     try stdout.print(
-        "= z: {d:0>3} y: {d:0>3} x: {d:0>3}\n",
+        "= cursor: z: {d:0>3} y: {d:0>3} x: {d:0>3}\n",
         .{ ctl.cursor[0], ctl.cursor[1], ctl.cursor[2] },
+    );
+    try stdout.print("= camera:\n", .{});
+    try stdout.print(
+        "= > pos: z: {d:0>3} y: {d:0>3} x: {d:0>3}\n",
+        .{ ctl.camera.pos[0], ctl.camera.pos[1], ctl.camera.pos[2] },
+    );
+    try stdout.print(
+        "= > rot: v: down ({d:0>2}) >: right({d:0>2})\n",
+        .{ ctl.camera.dim[0], ctl.camera.dim[1] },
     );
     try stdout.print(
         "= curr_block ({d}): {}\n",
@@ -218,4 +328,9 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
     try print_repeat_ln(stdout, "=", .{}, line_width * 4 + 1);
 
     try bw.flush();
+}
+
+test "controler compiles!" {
+    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDeclsRecursive(DirPosIter);
 }
