@@ -427,7 +427,7 @@ fn update_block(
                     std.debug.assert(that_block == .source or
                         that_block == .block);
                     this_power = if (0 <= @enumToInt(this_power))
-                        power.FROM_SOURCE_POWER
+                        power.BLOCK_ON_POWER
                     else
                         this_power;
                 },
