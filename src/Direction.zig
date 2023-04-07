@@ -93,6 +93,51 @@ pub const DirectionEnum = enum(u3) {
             null;
     }
 
+    pub fn add(
+        self: DirectionEnum,
+        comptime Uint: type,
+        z: Uint,
+        y: Uint,
+        x: Uint,
+    ) ?[3]Uint {
+        const should_inc = switch (self) {
+            .Above, .Right, .Down => true,
+            .Up, .Left, .Below => false,
+        };
+        const ov = switch (self) {
+            .Above, .Below => blk: {
+                const ov = if (should_inc)
+                    @addWithOverflow(z, 1)
+                else
+                    @subWithOverflow(z, 1);
+                break :blk .{ [3]Uint{ ov[0], y, x }, ov[1] };
+            },
+            .Up, .Down => blk: {
+                const ov = if (should_inc)
+                    @addWithOverflow(y, 1)
+                else
+                    @subWithOverflow(y, 1);
+                break :blk .{ [3]Uint{ z, ov[0], x }, ov[1] };
+            },
+            .Right, .Left => blk: {
+                const ov = if (should_inc)
+                    @addWithOverflow(x, 1)
+                else
+                    @subWithOverflow(x, 1);
+                break :blk .{ [3]Uint{ z, y, ov[0] }, ov[1] };
+            },
+        };
+        return if (ov[1] != 0) null else ov[0];
+    }
+
+    pub fn add_arr(
+        self: DirectionEnum,
+        comptime Uint: type,
+        pos: [3]Uint,
+    ) ?[3]Uint {
+        return self.add(Uint, pos[0], pos[1], pos[2]);
+    }
+
     pub fn inbounds(
         self: DirectionEnum,
         comptime Uint: type,
@@ -101,7 +146,12 @@ pub const DirectionEnum = enum(u3) {
         x: Uint,
         bounds: [3]Uint,
     ) ?[3]Uint {
-        return self.toDirection().inbounds(Uint, z, y, x, bounds);
+        const ret = self.add(Uint, z, y, x) orelse return null;
+        return for (ret, 0..) |v, i| {
+            if (v < 0 or bounds[i] <= v) {
+                break null;
+            }
+        } else ret;
     }
 
     pub fn inbounds_arr(
@@ -110,7 +160,7 @@ pub const DirectionEnum = enum(u3) {
         pos: [3]Uint,
         bounds: [3]Uint,
     ) ?[3]Uint {
-        return self.toDirection().inbounds_arr(Uint, pos, bounds);
+        return self.inbounds(Uint, pos[0], pos[1], pos[2], bounds);
     }
 };
 
@@ -124,23 +174,7 @@ pub fn inbounds(
     x: Uint,
     bounds: [3]Uint,
 ) ?[3]Uint {
-    if (@typeInfo(Uint) != .Int) {
-        @compileError("Expected int type, found '" ++ @typeName(Uint) ++ "'");
-    }
-    const d = bounds[0];
-    const h = bounds[1];
-    const w = bounds[2];
-    const iz = @intCast(isize, z) + self.z;
-    const iy = @intCast(isize, y) + self.y;
-    const ix = @intCast(isize, x) + self.x;
-    const z_is_ofb = iz < 0 or d <= iz;
-    const y_is_ofb = iy < 0 or h <= iy;
-    const x_is_ofb = ix < 0 or w <= ix;
-    return if (z_is_ofb or y_is_ofb or x_is_ofb) null else [_]Uint{
-        @intCast(Uint, iz),
-        @intCast(Uint, iy),
-        @intCast(Uint, ix),
-    };
+    return inbounds_arr(self, Uint, [_]Uint{ z, y, x }, bounds);
 }
 
 pub fn inbounds_arr(
@@ -149,7 +183,23 @@ pub fn inbounds_arr(
     pos: [3]Uint,
     bounds: [3]Uint,
 ) ?[3]Uint {
-    return inbounds(self, Uint, pos[0], pos[1], pos[2], bounds);
+    if (@typeInfo(Uint) != .Int) {
+        @compileError("Expected int type, found '" ++ @typeName(Uint) ++ "'");
+    }
+    var ret = @as([3]Uint, undefined);
+    return inline for (pos, 0..) |v, i| {
+        const ov = switch (@field(self, .{ "z", "y", "x" }[i])) {
+            0 => @addWithOverflow(v, 0),
+            -1 => @subWithOverflow(v, 1),
+            1 => @addWithOverflow(v, 1),
+            -2 => unreachable,
+        };
+        if (ov[1] != 0 or ov[0] < 0 or bounds[i] <= ov[0]) {
+            break null;
+        } else {
+            ret[i] = ov[0];
+        }
+    } else ret;
 }
 
 pub fn others(
