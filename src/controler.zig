@@ -33,7 +33,7 @@ const starting_block_state = [_]Block{
 
 const Camera = struct {
     pos: [3]isize = .{ 0, 0, 0 },
-    dim: [2]usize = .{ 3, 7 },
+    dim: [2]usize = .{ 7, 15 },
 
     fn is_cursor_inside(self: Camera, cursor: [3]u8) bool {
         return (self.pos[0] <= cursor[0] and
@@ -85,6 +85,8 @@ pub const CtlInput = union(enum) {
     step: struct {},
     putBlock: struct {},
     moveCursor: DirectionEnum,
+    expandCamera: DirectionEnum,
+    retractCamera: DirectionEnum,
     nextBlock: struct {},
     prevBlock: struct {},
     nextRotate: struct {},
@@ -116,32 +118,49 @@ fn DirPosIter(comptime Int: type) type {
             };
         }
 
-        fn inbounds_or_null(pos: [3]Int, bounds: [3]Uint) ?[3]Uint {
-            var ret = @as([3]Uint, undefined);
+        fn is_inbounds(pos: [3]Int, bounds: [3]Uint) bool {
             return for (pos, 0..) |x, i| {
-                if (x < 0 or bounds[i] < x) {
-                    break null;
-                } else {
-                    ret[i] = @intCast(Uint, x);
+                if (x < 0 or bounds[i] <= x) {
+                    break false;
                 }
-            } else ret;
+            } else true;
         }
 
-        pub fn next_m_pos(self: *DirPosIter(Int)) ??[3]Uint {
+        pub const NextMPosError = error{DirPosIterOverflow};
+
+        pub const IB_Pos = struct {
+            inbounds: bool,
+            pos: [3]Int,
+
+            pub fn uint_pos(self: IB_Pos) [3]Uint {
+                var ret = @as([3]Uint, undefined);
+                for (self.pos, 0..) |x, i| {
+                    ret[i] = @intCast(Uint, x);
+                }
+                return ret;
+            }
+        };
+
+        pub fn next_m_pos(self: *DirPosIter(Int)) NextMPosError!?IB_Pos {
             if (self.count > 0) {
                 self.*.count -= 1;
-                const ret_pos =
-                    inbounds_or_null(self.offset, self.bounds);
+                const ret_pos = .{
+                    .inbounds = is_inbounds(
+                        self.offset,
+                        self.bounds,
+                    ),
+                    .pos = self.offset,
+                };
                 self.*.offset = if (self.dir.add_arr(
                     @TypeOf(self.offset[0]),
                     self.offset,
                 )) |val|
                     val
                 else
-                    self.offset;
+                    return NextMPosError.DirPosIterOverflow;
                 return ret_pos;
             } else {
-                return @as(??[3]Uint, null);
+                return @as(NextMPosError!?IB_Pos, null);
             }
         }
     };
@@ -188,6 +207,42 @@ pub fn update(
         )) |npos| {
             newctl.cursor = npos;
             newctl.camera.mut_follow_cursor(newctl.cursor, de);
+        },
+        .expandCamera => |de| {
+            const dec_val: u1 = switch (de) {
+                .Above, .Below => 0,
+                .Up, .Left => 1,
+                .Down, .Right => 0,
+            };
+            switch (de) {
+                .Above, .Below => {},
+                .Up, .Down => {
+                    newctl.camera.pos[1] -= dec_val;
+                    newctl.camera.dim[0] += 1;
+                },
+                .Right, .Left => {
+                    newctl.camera.pos[2] -= dec_val;
+                    newctl.camera.dim[1] += 1;
+                },
+            }
+        },
+        .retractCamera => |de| {
+            const inc_val: u1 = switch (de) {
+                .Above, .Below => 0,
+                .Up, .Left => 0,
+                .Down, .Right => 1,
+            };
+            switch (de) {
+                .Above, .Below => {},
+                .Up, .Down => {
+                    newctl.camera.pos[1] += inc_val;
+                    newctl.camera.dim[0] -|= 1;
+                },
+                .Right, .Left => {
+                    newctl.camera.pos[2] += inc_val;
+                    newctl.camera.dim[1] -|= 1;
+                },
+            }
         },
         .nextBlock => newctl.curr_block =
             (newctl.curr_block +% 1) % CtlState.blks_len,
@@ -255,71 +310,61 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
     try stdout.print("+", .{});
     try print_repeat_ln(stdout, "---+", .{}, line_width);
 
-    while (screen_down_iter.next_m_pos()) |m_pos| {
-        if (m_pos) |upos| {
-            const pos = [_]isize{
-                @as(isize, upos[0]),
-                @as(isize, upos[1]),
-                @as(isize, upos[2]),
-            };
-            { // build line_buffer
-                var screen_right_iter = DirPosIter(isize).init(
-                    DirectionEnum.Right,
-                    .{ sim.depth, sim.height, sim.width },
-                    pos,
-                    camera.dim[1] + 1,
-                );
+    while (try screen_down_iter.next_m_pos()) |m_pos| {
+        const pos = [_]isize{
+            @as(isize, m_pos.pos[0]),
+            @as(isize, m_pos.pos[1]),
+            @as(isize, m_pos.pos[2]),
+        };
+        { // build line_buffer
+            var screen_right_iter = DirPosIter(isize).init(
+                DirectionEnum.Right,
+                .{ sim.depth, sim.height, sim.width },
+                pos,
+                camera.dim[1] + 1,
+            );
 
-                var i = @as(usize, 0);
-                while (screen_right_iter.next_m_pos()) |m_lpos| : (i += 1) {
-                    line_buffer[i] =
-                        if (m_lpos) |lpos|
-                    blk: {
-                        const b = state.block_grid[lpos[0]][lpos[1]][lpos[2]];
-                        const this_power = state.power_grid[lpos[0]][lpos[1]][lpos[2]];
-                        break :blk sim.render_block(b, this_power);
-                    } else .{
-                        .up_row = "***".*,
-                        .mid_row = "***".*,
-                        .bot_row = "***".*,
-                    };
-                }
+            var i = @as(usize, 0);
+            while (try screen_right_iter.next_m_pos()) |m_lpos| : (i += 1) {
+                line_buffer[i] =
+                    if (m_lpos.inbounds)
+                blk: {
+                    const lpos = m_lpos.uint_pos();
+                    const b = state.block_grid[lpos[0]][lpos[1]][lpos[2]];
+                    const this_power = state.power_grid[lpos[0]][lpos[1]][lpos[2]];
+                    break :blk sim.render_block(b, this_power);
+                } else .{
+                    .up_row = "***".*,
+                    .mid_row = "***".*,
+                    .bot_row = "***".*,
+                };
             }
+        }
 
-            try stdout.print("|", .{});
-            if (pos[0] == ctl.cursor[0] and pos[1] == ctl.cursor[1]) {
-                for (line_buffer, 0..) |x, i| {
-                    if (pos[2] + @intCast(isize, i) == ctl.cursor[2]) {
-                        try stdout.print("{s: ^2}x|", .{x.up_row[0..2]});
-                    } else {
-                        try stdout.print("{s: ^3}|", .{x.up_row});
-                    }
-                } else try stdout.print("\n", .{});
-            } else {
-                for (line_buffer) |x| {
+        try stdout.print("|", .{});
+        if (pos[0] == ctl.cursor[0] and pos[1] == ctl.cursor[1]) {
+            for (line_buffer, 0..) |x, i| {
+                if (pos[2] + @intCast(isize, i) == ctl.cursor[2]) {
+                    try stdout.print("{s: ^2}x|", .{x.up_row[0..2]});
+                } else {
                     try stdout.print("{s: ^3}|", .{x.up_row});
-                } else try stdout.print("\n", .{});
-            }
-
-            try stdout.print("|", .{});
-            for (line_buffer) |x| {
-                try stdout.print("{s: ^3}|", .{x.mid_row});
-            } else try stdout.print("\n", .{});
-
-            try stdout.print("|", .{});
-            for (line_buffer) |x| {
-                try stdout.print("{s: ^3}|", .{x.bot_row});
+                }
             } else try stdout.print("\n", .{});
         } else {
-            try stdout.print("|", .{});
-            try print_repeat_ln(stdout, "***|", .{}, line_width);
-
-            try stdout.print("|", .{});
-            try print_repeat_ln(stdout, "***|", .{}, line_width);
-
-            try stdout.print("|", .{});
-            try print_repeat_ln(stdout, "***|", .{}, line_width);
+            for (line_buffer) |x| {
+                try stdout.print("{s: ^3}|", .{x.up_row});
+            } else try stdout.print("\n", .{});
         }
+
+        try stdout.print("|", .{});
+        for (line_buffer) |x| {
+            try stdout.print("{s: ^3}|", .{x.mid_row});
+        } else try stdout.print("\n", .{});
+
+        try stdout.print("|", .{});
+        for (line_buffer) |x| {
+            try stdout.print("{s: ^3}|", .{x.bot_row});
+        } else try stdout.print("\n", .{});
 
         try stdout.print("+", .{});
         try print_repeat_ln(stdout, "---+", .{}, line_width);

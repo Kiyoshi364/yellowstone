@@ -101,9 +101,16 @@ where:
 |`'d'`|move cursor right|
 |`'z'`|move cursor above|
 |`'x'`|move cursor below|
+|`'H'`|retract camera left|
+|`'J'`|expand camera down|
+|`'K'`|retract camera up|
+|`'L'`|expand camera right|
 |`'n'`|select next block|
 |`'p'`|select prev block|
 |`'.'`|next rotate selected block|
 |`','`|prev rotate selected block|
 |`'q'`|exit program|
 
+> _Note:_
+> There are unmaped Actions like: 'expand camera left'.
+> Maybe there will be some kind of config file to (re)map Actions.
