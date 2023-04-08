@@ -33,15 +33,15 @@ const starting_block_state = [_]Block{
 
 const Camera = struct {
     pos: [3]isize = .{ 0, 0, 0 },
-    dim: [2]usize = .{ 4, 8 },
+    dim: [2]usize = .{ 3, 7 },
 
     fn is_cursor_inside(self: Camera, cursor: [3]u8) bool {
         return (self.pos[0] <= cursor[0] and
-            cursor[0] - self.pos[0] < 1) and
+            cursor[0] - self.pos[0] <= 0) and
             (self.pos[1] <= cursor[1] and
-            cursor[1] - self.pos[1] < self.dim[0]) and
+            cursor[1] - self.pos[1] <= self.dim[0]) and
             (self.pos[2] <= cursor[2] and
-            cursor[2] - self.pos[2] < self.dim[1]);
+            cursor[2] - self.pos[2] <= self.dim[1]);
     }
 
     fn mut_follow_cursor(
@@ -240,7 +240,7 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
     const stdout = bw.writer();
 
     const camera = ctl.camera;
-    const line_width = camera.dim[1];
+    const line_width = camera.dim[1] + 1;
 
     const line_buffer = try alloc.alloc(sim.DrawBlock, line_width);
     defer alloc.free(line_buffer);
@@ -249,7 +249,7 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
         DirectionEnum.Down,
         .{ sim.depth, sim.height, sim.width },
         camera.pos,
-        camera.dim[0],
+        camera.dim[0] + 1,
     );
 
     try stdout.print("+", .{});
@@ -267,7 +267,7 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
                     DirectionEnum.Right,
                     .{ sim.depth, sim.height, sim.width },
                     pos,
-                    camera.dim[1],
+                    camera.dim[1] + 1,
                 );
 
                 var i = @as(usize, 0);
@@ -339,7 +339,7 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
     );
     try stdout.print(
         "= > rot: v: down ({d:0>2}) >: right({d:0>2})\n",
-        .{ ctl.camera.dim[0], ctl.camera.dim[1] },
+        .{ ctl.camera.dim[0] + 1, ctl.camera.dim[1] + 1 },
     );
     try stdout.print(
         "= curr_block ({d}): {}\n",
