@@ -7,6 +7,8 @@ pub const block = @import("block.zig");
 pub const sim = @import("simulation.zig");
 pub const ctl = @import("controler.zig");
 
+var global_term: ?Term = null;
+
 pub fn main() !void {
     var arena =
         std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -57,6 +59,8 @@ pub fn main() !void {
 
     const term = try config_term();
     defer term.unconfig_term() catch unreachable;
+    global_term = term;
+    defer global_term = null;
 
     try ctl.draw(ctlstate, alloc);
     while (true) {
@@ -232,6 +236,19 @@ fn config_term() !Term {
             .old_term = old_term,
         };
     }
+}
+
+const ST = std.builtin.StackTrace;
+pub fn panic(msg: []const u8, trace: ?*ST, ret_addr: ?usize) noreturn {
+    @setCold(true);
+    if (global_term) |term| {
+        term.unconfig_term() catch
+            std.debug.print(
+            "Couldn't restore terminal. Try blindly typing 'reset^J' (^J means Ctrl+J)\n",
+            .{},
+        );
+    }
+    std.builtin.default_panic(msg, trace, ret_addr);
 }
 
 test "It compiles!" {
