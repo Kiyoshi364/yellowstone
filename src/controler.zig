@@ -47,18 +47,23 @@ const Camera = struct {
     fn mut_follow_cursor(
         self: *Camera,
         cursor: [3]u8,
-        de: DirectionEnum,
     ) void {
         if (self.is_cursor_inside(cursor)) {
             // Empty
         } else {
-            self.*.pos = if (de.add_arr(
-                @TypeOf(self.pos[0]),
-                self.pos,
-            )) |val|
-                val
-            else
-                self.pos;
+            if (cursor[0] < self.pos[0]) {
+                self.pos[0] = cursor[0];
+            } else if (0 <= cursor[0] - self.pos[0]) {
+                self.pos[0] = cursor[0] - 0;
+            }
+            for (1..3) |i| {
+                if (cursor[i] < self.pos[i]) {
+                    self.pos[i] = cursor[i];
+                } else if (self.dim[i - 1] <= cursor[i] - self.pos[i]) {
+                    self.pos[i] =
+                        cursor[i] - @intCast(isize, self.dim[i - 1]);
+                }
+            }
         }
     }
 };
@@ -207,7 +212,7 @@ pub fn update(
             [_]u8{ sim.depth, sim.height, sim.width },
         )) |npos| {
             newctl.cursor = npos;
-            newctl.camera.mut_follow_cursor(newctl.cursor, de);
+            newctl.camera.mut_follow_cursor(newctl.cursor);
         },
         .moveCamera => |de| newctl.camera.pos =
             de.add_sat_arr(isize, newctl.camera.pos),
