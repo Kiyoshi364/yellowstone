@@ -138,6 +138,44 @@ pub const DirectionEnum = enum(u3) {
         return self.add(Uint, pos[0], pos[1], pos[2]);
     }
 
+    pub fn add_sat(
+        self: DirectionEnum,
+        comptime Uint: type,
+        z: Uint,
+        y: Uint,
+        x: Uint,
+    ) [3]Uint {
+        const should_inc = switch (self) {
+            .Above, .Right, .Down => true,
+            .Up, .Left, .Below => false,
+        };
+        return switch (self) {
+            .Above, .Below => [_]Uint{
+                if (should_inc) z +| 1 else z -| 1,
+                y,
+                x,
+            },
+            .Up, .Down => [_]Uint{
+                z,
+                if (should_inc) y +| 1 else y -| 1,
+                x,
+            },
+            .Right, .Left => [_]Uint{
+                z,
+                y,
+                if (should_inc) x +| 1 else x -| 1,
+            },
+        };
+    }
+
+    pub fn add_sat_arr(
+        self: DirectionEnum,
+        comptime Uint: type,
+        pos: [3]Uint,
+    ) [3]Uint {
+        return self.add_sat(Uint, pos[0], pos[1], pos[2]);
+    }
+
     pub fn inbounds(
         self: DirectionEnum,
         comptime Uint: type,

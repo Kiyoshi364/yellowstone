@@ -85,6 +85,7 @@ pub const CtlInput = union(enum) {
     step: struct {},
     putBlock: struct {},
     moveCursor: DirectionEnum,
+    moveCamera: DirectionEnum,
     expandCamera: DirectionEnum,
     retractCamera: DirectionEnum,
     nextBlock: struct {},
@@ -208,6 +209,8 @@ pub fn update(
             newctl.cursor = npos;
             newctl.camera.mut_follow_cursor(newctl.cursor, de);
         },
+        .moveCamera => |de| newctl.camera.pos =
+            de.add_sat_arr(isize, newctl.camera.pos),
         .expandCamera => |de| {
             const dec_val: u1 = switch (de) {
                 .Above, .Below => 0,
