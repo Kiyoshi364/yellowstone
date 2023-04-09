@@ -305,3 +305,40 @@ being the 3rd one (_Kind/Type of block_) the least offender.
 The main reason it's there is to ease
 the conflicting principles on how to introduce pistons,
 currently I have no ideia how to make it work.
+
+---
+# Ideas for the future
+
+Here will be ideias that had some thought put into them.
+They might be implemented in the future,
+or might not with some reasoning behind.
+They are subdivided in:
+* Simulation: new features, blocks, interactions, ...;
+  stuff related to the simulation itself.
+* Environment: "stack blocks", record/replay, run on smartphone, ...;
+  user interaction outside of simutalion itself.
+* Implementation: runs faster, less memory, more efficient, ...;
+  changes here should not consern "normal users" besides
+  performance reasons.
+
+> _Note:_ for now the sections are empty.
+> There should be an explanation in the future.
+
+---
+## Simulation
+
+### (No) Pistons/Sticky Pistons
+### LED block
+
+## Environment
+
+### Copy and Paste (Stacking)
+### File format text and binary (Serialization/Deserialization)
+### Support to Other Plataforms
+
+## Implementation
+
+### Event List hold unique positions
+### Events to Empty block are not stored
+### Cache machines' positions
+### Unchanged machines don't trigger update events
