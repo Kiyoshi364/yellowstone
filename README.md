@@ -101,6 +101,12 @@ where:
 |`'d'`|move cursor right|
 |`'z'`|move cursor above|
 |`'x'`|move cursor below|
+|`'h'`|move camera left|
+|`'j'`|move camera down|
+|`'k'`|move camera up|
+|`'l'`|move camera right|
+|`'u'`|move camera above|
+|`'i'`|move camera below|
 |`'H'`|retract camera left|
 |`'J'`|expand camera down|
 |`'K'`|retract camera up|
