@@ -295,11 +295,12 @@ fn print_input_ln(writer: anytype, input_count: usize, m_input: ?sim.Input) !voi
     try writer.print("\n", .{});
 }
 
-pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
+pub fn draw(
+    ctl: CtlState,
+    alloc: std.mem.Allocator,
+    writer: anytype,
+) !void {
     const state = ctl.sim_state;
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
 
     const camera = ctl.camera;
     const line_width = camera.dim[1] + 1;
@@ -314,8 +315,8 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
         camera.dim[0] + 1,
     );
 
-    try stdout.print("+", .{});
-    try print_repeat_ln(stdout, "---+", .{}, line_width);
+    try writer.print("+", .{});
+    try print_repeat_ln(writer, "---+", .{}, line_width);
 
     while (try screen_down_iter.next_m_pos()) |m_pos| {
         const pos = [_]isize{
@@ -348,66 +349,64 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
             }
         }
 
-        try stdout.print("|", .{});
+        try writer.print("|", .{});
         if (pos[0] == ctl.cursor[0] and pos[1] == ctl.cursor[1]) {
             for (line_buffer, 0..) |x, i| {
                 if (pos[2] + @intCast(isize, i) == ctl.cursor[2]) {
-                    try stdout.print("{s: ^2}x|", .{x.up_row[0..2]});
+                    try writer.print("{s: ^2}x|", .{x.up_row[0..2]});
                 } else {
-                    try stdout.print("{s: ^3}|", .{x.up_row});
+                    try writer.print("{s: ^3}|", .{x.up_row});
                 }
-            } else try stdout.print("\n", .{});
+            } else try writer.print("\n", .{});
         } else {
             for (line_buffer) |x| {
-                try stdout.print("{s: ^3}|", .{x.up_row});
-            } else try stdout.print("\n", .{});
+                try writer.print("{s: ^3}|", .{x.up_row});
+            } else try writer.print("\n", .{});
         }
 
-        try stdout.print("|", .{});
+        try writer.print("|", .{});
         for (line_buffer) |x| {
-            try stdout.print("{s: ^3}|", .{x.mid_row});
-        } else try stdout.print("\n", .{});
+            try writer.print("{s: ^3}|", .{x.mid_row});
+        } else try writer.print("\n", .{});
 
-        try stdout.print("|", .{});
+        try writer.print("|", .{});
         for (line_buffer) |x| {
-            try stdout.print("{s: ^3}|", .{x.bot_row});
-        } else try stdout.print("\n", .{});
+            try writer.print("{s: ^3}|", .{x.bot_row});
+        } else try writer.print("\n", .{});
 
-        try stdout.print("+", .{});
-        try print_repeat_ln(stdout, "---+", .{}, line_width);
+        try writer.print("+", .{});
+        try print_repeat_ln(writer, "---+", .{}, line_width);
     }
 
-    try print_repeat_ln(stdout, "=", .{}, line_width * 4 + 1);
+    try print_repeat_ln(writer, "=", .{}, line_width * 4 + 1);
 
-    try print_input_ln(stdout, ctl.input_count, ctl.last_input);
-    try stdout.print(
+    try print_input_ln(writer, ctl.input_count, ctl.last_input);
+    try writer.print(
         "= time: {d: >5} step{s}\n",
         .{
             ctl.time_count,
             if (ctl.time_count == 1) "" else "s",
         },
     );
-    try stdout.print(
+    try writer.print(
         "= cursor: z: {d:0>3} y: {d:0>3} x: {d:0>3}\n",
         .{ ctl.cursor[0], ctl.cursor[1], ctl.cursor[2] },
     );
-    try stdout.print("= camera:\n", .{});
-    try stdout.print(
+    try writer.print("= camera:\n", .{});
+    try writer.print(
         "= > pos: z: {d: >3} y: {d: >3} x: {d: >3}\n",
         .{ ctl.camera.pos[0], ctl.camera.pos[1], ctl.camera.pos[2] },
     );
-    try stdout.print(
+    try writer.print(
         "= > rot: v: down ({d:0>2}) >: right({d:0>2})\n",
         .{ ctl.camera.dim[0] + 1, ctl.camera.dim[1] + 1 },
     );
-    try stdout.print(
+    try writer.print(
         "= curr_block ({d}): {}\n",
         .{ ctl.curr_block, ctl.block_state[ctl.curr_block] },
     );
 
-    try print_repeat_ln(stdout, "=", .{}, line_width * 4 + 1);
-
-    try bw.flush();
+    try print_repeat_ln(writer, "=", .{}, line_width * 4 + 1);
 }
 
 test "controler compiles!" {

@@ -64,14 +64,20 @@ pub fn main() !void {
     global_term = term;
     defer global_term = null;
 
-    try ctl.draw(ctlstate, alloc);
+    const stdout_file = std.io.getStdOut().writer();
+    var bw = std.io.bufferedWriter(stdout_file);
+    const stdout = bw.writer();
+
+    try ctl.draw(ctlstate, alloc, stdout);
+    try bw.flush();
     while (true) {
         const ctlinput = try read_ctlinput(&stdin) orelse {
             break;
         };
 
         ctlstate = try controler.step(ctlstate, ctlinput, alloc);
-        try ctl.draw(ctlstate, alloc);
+        try ctl.draw(ctlstate, alloc, stdout);
+        try bw.flush();
 
         std.debug.assert(arena.reset(.{ .free_all = {} }));
     }
