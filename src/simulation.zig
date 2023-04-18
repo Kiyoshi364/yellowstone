@@ -78,7 +78,7 @@ test "State compiles!" {
 }
 
 pub const Input = union(enum) {
-    empty,
+    step,
     putBlock: struct { z: u8, y: u8, x: u8, block: Block },
 };
 
@@ -96,10 +96,15 @@ pub fn update(
 ) Allocator.Error!State {
     var newstate = state;
 
+    const should_step = switch (input) {
+        .step => true,
+        .putBlock => false,
+    };
+
     var mod_stack = std.ArrayList(State.Pos).init(alloc);
     defer mod_stack.deinit();
 
-    { // push "delayed machines" interactions
+    if (should_step) { // push "delayed machines" interactions
         // Note: this is before "handle input"
         // because update_list is a stack
         // and this should be handled after
@@ -158,7 +163,7 @@ pub fn update(
 
     { // handle input
         switch (input) {
-            .empty => {},
+            .step => {},
             .putBlock => |i| {
                 newstate.block_grid[i.z][i.y][i.x] = i.block;
                 newstate.power_grid[i.z][i.y][i.x] = switch (i.block) {
@@ -255,7 +260,7 @@ pub fn update(
         }
     }
 
-    { // For each repeater, shift input
+    if (should_step) { // For each repeater, shift input
         var block_it = State.BlockIter{};
         while (block_it.next_pos()) |pos| {
             const z = pos[0];
@@ -292,7 +297,7 @@ pub fn update(
         }
     }
 
-    { // For each negator, shift input
+    if (should_step) { // For each negator, shift input
         var block_it = State.BlockIter{};
         while (block_it.next_pos()) |pos| {
             const z = pos[0];

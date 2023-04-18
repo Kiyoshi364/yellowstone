@@ -181,7 +181,7 @@ pub fn update(
     var newctl = ctl;
     switch (cinput) {
         .step => {
-            const input = .empty;
+            const input = .step;
             newctl.sim_state =
                 try sim.simulation.update(
                 ctl.sim_state,
@@ -282,7 +282,7 @@ fn print_input_ln(writer: anytype, update_count: usize, m_input: ?sim.Input) !vo
     if (m_input) |input| {
         try writer.print("= Input({d}): ", .{update_count});
         switch (input) {
-            .empty => try writer.print("Step", .{}),
+            .step => try writer.print("Step", .{}),
             .putBlock => |i| {
                 try writer.print("Put .{s} at (y: {}, x: {})", .{
                     @tagName(i.block),
