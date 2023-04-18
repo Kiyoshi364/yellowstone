@@ -70,7 +70,8 @@ const Camera = struct {
 };
 
 pub const CtlState = struct {
-    update_count: usize = 0,
+    input_count: usize = 0,
+    time_count: usize = 0,
     sim_state: SimState,
     last_input: ?SimInput = null,
     cursor: [3]u8,
@@ -188,8 +189,7 @@ pub fn update(
                 input,
                 alloc,
             );
-            newctl.update_count = ctl.update_count +| 1;
-            newctl.last_input = input;
+            newctl.time_count = ctl.time_count +| 1;
         },
         .putBlock => {
             const input = SimInput{ .putBlock = .{
@@ -204,7 +204,7 @@ pub fn update(
                 input,
                 alloc,
             );
-            newctl.update_count = ctl.update_count +| 1;
+            newctl.input_count = ctl.input_count +| 1;
             newctl.last_input = input;
         },
         .moveCursor => |de| if (de.inbounds_arr(
@@ -278,19 +278,17 @@ fn print_repeat_ln(
     try writer.print("\n", .{});
 }
 
-fn print_input_ln(writer: anytype, update_count: usize, m_input: ?sim.Input) !void {
+fn print_input_ln(writer: anytype, input_count: usize, m_input: ?sim.Input) !void {
     if (m_input) |input| {
-        try writer.print("= Input({d}): ", .{update_count});
-        switch (input) {
-            .step => try writer.print("Step", .{}),
-            .putBlock => |i| {
-                try writer.print("Put .{s} at (y: {}, x: {})", .{
-                    @tagName(i.block),
-                    i.y,
-                    i.x,
-                });
-            },
-        }
+        std.debug.assert(input == .putBlock);
+        const i = input.putBlock;
+        try writer.print("= Input({d}): ", .{input_count});
+        try writer.print("Put .{s} at (z: {}, y: {}, x: {})", .{
+            @tagName(i.block),
+            i.z,
+            i.y,
+            i.x,
+        });
     } else {
         try writer.print("= Start", .{});
     }
@@ -381,7 +379,14 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
 
     try print_repeat_ln(stdout, "=", .{}, line_width * 4 + 1);
 
-    try print_input_ln(stdout, ctl.update_count, ctl.last_input);
+    try print_input_ln(stdout, ctl.input_count, ctl.last_input);
+    try stdout.print(
+        "= time: {d: >5} step{s}\n",
+        .{
+            ctl.time_count,
+            if (ctl.time_count == 1) "" else "s",
+        },
+    );
     try stdout.print(
         "= cursor: z: {d:0>3} y: {d:0>3} x: {d:0>3}\n",
         .{ ctl.cursor[0], ctl.cursor[1], ctl.cursor[2] },
