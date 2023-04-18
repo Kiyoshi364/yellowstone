@@ -24,6 +24,7 @@ const starting_block_state = [_]Block{
     .{ .source = .{} },
     .{ .wire = .{} },
     .{ .block = .{} },
+    .{ .led = .{} },
     .{ .repeater = Repeater.init(.Up, .one) },
     .{ .repeater = Repeater.init(.Up, .two) },
     .{ .repeater = Repeater.init(.Up, .three) },
@@ -342,9 +343,9 @@ pub fn draw(ctl: CtlState, alloc: std.mem.Allocator) !void {
                     const this_power = state.power_grid[lpos[0]][lpos[1]][lpos[2]];
                     break :blk sim.render_block(b, this_power);
                 } else .{
-                    .up_row = "***".*,
-                    .mid_row = "***".*,
-                    .bot_row = "***".*,
+                    .up_row = "&&&".*,
+                    .mid_row = "&&&".*,
+                    .bot_row = "&&&".*,
                 };
             }
         }

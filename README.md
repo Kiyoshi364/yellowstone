@@ -52,6 +52,7 @@ See: ([downloads page](https:ziglang.org/download))
 |Source|`'S'`|Redstone block|Distributes powers to adjacent tiles|-|
 |Wire|`'w'`|Redstone dust|Transport power to adjacent tiles|Always "broadcasts" power|
 |Block|`'B'`|Any Solid Block|Can be powered, limits power transportation|-|
+|LED|`'L'`|Redstone Lamp|Similar to Block, but render diffentently when on power|-|
 |Repeater|`'r'`|Repeater|Extends power transportation|Cannot be "locked"|
 |Negator|`'n'`|Redstone Torch|Negates power|-|
 
@@ -61,12 +62,15 @@ See: ([downloads page](https:ziglang.org/download))
 Each tile is rendered as a 3x3 text (ignoring tile boundaries).
 Some tiles examples:
 ```console
-+---+---+---+---+---+---+---+
-|   |   |   |  x|   |   | ^ |
-|   | S | w | w | B | r>| n |
-|   |*  |f  |e  |1  |1 1|1  |
-+---+---+---+---+---+---+---+
++---+---+---+---+---+---+---+---+
+|   |   |   |  x|   |***|   | ^ |
+|   | S | w | w | B |***| r>| n |
+|   |*  |f  |e  |1  |***|1 1|1  |
++---+---+---+---+---+---+---+---+
 ```
+
+> **Note:**
+> "All stars" is a turned on LED
 
 A general tile is organized in this way:
 ```console

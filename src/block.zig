@@ -11,6 +11,7 @@ pub const BlockType = enum(u4) {
     source,
     wire,
     block,
+    led,
     repeater,
     negator,
 };
@@ -20,12 +21,18 @@ pub const Block = union(BlockType) {
     source: struct {},
     wire: struct {},
     block: struct {},
+    led: struct {},
     repeater: Repeater,
     negator: Negator,
 
     pub fn facing(self: Block) ?DirectionEnum {
         return switch (self) {
-            .empty, .source, .wire, .block => null,
+            .empty,
+            .source,
+            .wire,
+            .block,
+            .led,
+            => null,
             .repeater => |r| r.facing,
             .negator => |r| r.facing,
         };
@@ -33,7 +40,7 @@ pub const Block = union(BlockType) {
 
     pub fn nextRotate(self: Block) Block {
         return switch (self) {
-            .empty, .source, .wire, .block => self,
+            .empty, .source, .wire, .block, .led => self,
             .repeater => |r| .{
                 .repeater = r.with_facing(r.facing.next()),
             },
@@ -45,7 +52,7 @@ pub const Block = union(BlockType) {
 
     pub fn prevRotate(self: Block) Block {
         return switch (self) {
-            .empty, .source, .wire, .block => self,
+            .empty, .source, .wire, .block, .led => self,
             .repeater => |r| .{
                 .repeater = r.with_facing(r.facing.prev()),
             },
@@ -67,6 +74,7 @@ pub const Block = union(BlockType) {
             .source => fmt(writer, "S", .{}),
             .wire => fmt(writer, "w", .{}),
             .block => fmt(writer, "B", .{}),
+            .led => fmt(writer, "L", .{}),
             .repeater => |r| fmt(writer, "r{c}{c}{c}", .{
                 "1234"[@enumToInt(r.get_delay())],
                 "o^>v<x"[@enumToInt(r.facing)],

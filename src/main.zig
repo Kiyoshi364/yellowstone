@@ -38,6 +38,7 @@ pub fn main() !void {
         };
         state.power_grid[1][3][10] = .repeater;
         state.block_grid[1][3][11] = .{ .block = .{} };
+        state.block_grid[1][4][4] = .{ .led = .{} };
         state.block_grid[1][5][0] = .{ .wire = .{} };
         state.block_grid[1][5][1] = .{
             .negator = .{ .facing = .Right },
@@ -45,6 +46,7 @@ pub fn main() !void {
         state.power_grid[1][5][1] = .negator;
         state.block_grid[1][6][0] = .{ .wire = .{} };
         state.block_grid[1][6][1] = .{ .block = .{} };
+        state.block_grid[1][6][2] = .{ .led = .{} };
         break :blk state;
     };
 
