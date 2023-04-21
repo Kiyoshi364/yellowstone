@@ -105,6 +105,17 @@ pub const DirectionEnum = enum(u3) {
         return @enumToInt(self.toAxis());
     }
 
+    pub fn is_positive(self: DirectionEnum) bool {
+        return switch (self) {
+            .Above, .Down, .Right => true,
+            .Below, .Up, .Left => false,
+        };
+    }
+
+    pub fn is_negative(self: DirectionEnum) bool {
+        return !self.is_positive();
+    }
+
     pub fn add(
         self: DirectionEnum,
         comptime Uint: type,

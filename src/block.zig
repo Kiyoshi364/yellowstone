@@ -38,6 +38,19 @@ pub const Block = union(BlockType) {
         };
     }
 
+    pub fn with_facing(self: Block, de: DirectionEnum) Block {
+        return switch (self) {
+            .empty,
+            .source,
+            .wire,
+            .block,
+            .led,
+            => self,
+            .repeater => |r| .{ .repeater = r.with_facing(de) },
+            .negator => |r| .{ .negator = r.with_facing(de) },
+        };
+    }
+
     pub fn nextRotate(self: Block) Block {
         return switch (self) {
             .empty, .source, .wire, .block, .led => self,

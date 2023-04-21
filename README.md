@@ -115,6 +115,9 @@ where:
 |`'J'`|expand camera down|
 |`'K'`|retract camera up|
 |`'L'`|expand camera right|
+|`'f'`|flip camera left-right|
+|`'F'`|flip camera up-down|
+|`'g'`|flip camera below-above|
 |`'n'`|select next block|
 |`'p'`|select prev block|
 |`'.'`|next rotate selected block|
@@ -345,6 +348,7 @@ They are subdivided in:
 ### Copy and Paste (Stacking)
 ### File format text and binary (Serialization/Deserialization)
 ### Support to Other Plataforms
+### Config/(Re)map file format
 
 ## Implementation
 

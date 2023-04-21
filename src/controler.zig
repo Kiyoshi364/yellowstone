@@ -5,6 +5,7 @@ const lib_sim = @import("lib_sim");
 
 const Direction = @import("Direction.zig");
 const DirectionEnum = Direction.DirectionEnum;
+const Axis = Direction.Axis;
 
 const sim = @import("simulation.zig");
 const SimState = sim.State;
@@ -39,15 +40,45 @@ const starting_block_state = [_]Block{
 
 const Camera = struct {
     pos: [3]isize = .{ 0, 0, 0 },
+    dir: [3]DirectionEnum = .{ .Above, .Down, .Right },
     dim: [3]Uisize = .{ 0, 7, 15 },
 
+    fn perspective_de(self: Camera, de: DirectionEnum) DirectionEnum {
+        const dir = self.dir[de.axis()];
+        return if (de.is_positive())
+            dir
+        else
+            dir.back();
+    }
+
+    fn block_with_perspective(
+        self: Camera,
+        b: Block,
+    ) Block {
+        return if (b.facing()) |de|
+            b.with_facing(self.perspective_de(de))
+        else
+            b;
+    }
+
     fn is_cursor_inside(self: Camera, cursor: [3]u8) bool {
-        return (self.pos[0] <= cursor[0] and
-            cursor[0] - self.pos[0] <= self.dim[0]) and
-            (self.pos[1] <= cursor[1] and
-            cursor[1] - self.pos[1] <= self.dim[1]) and
-            (self.pos[2] <= cursor[2] and
-            cursor[2] - self.pos[2] <= self.dim[2]);
+        return for (0..3) |i| {
+            const axis = self.dir[i].axis();
+            const is_pos = self.dir[i].is_positive();
+            if (is_pos) {
+                if (!(self.pos[i] <= cursor[axis] and
+                    cursor[axis] - self.pos[i] <= self.dim[i]))
+                {
+                    break false;
+                }
+            } else {
+                if (!(cursor[axis] <= self.pos[i] and
+                    self.pos[i] - self.dim[i] <= cursor[axis]))
+                {
+                    break false;
+                }
+            }
+        } else true;
     }
 
     fn mut_follow_cursor(
@@ -57,12 +88,23 @@ const Camera = struct {
         if (self.is_cursor_inside(cursor)) {
             // Empty
         } else {
-            for (0..3) |i| {
-                if (cursor[i] < self.pos[i]) {
-                    self.pos[i] = cursor[i];
-                } else if (self.dim[i] <= cursor[i] - self.pos[i]) {
-                    self.pos[i] =
-                        cursor[i] - self.dim[i];
+            for (self.dir, 0..3) |d, i| {
+                const axis = d.axis();
+                const is_pos = self.dir[i].is_positive();
+                if (is_pos) {
+                    if (cursor[axis] < self.pos[i]) {
+                        self.pos[i] = cursor[axis];
+                    } else if (self.dim[i] < cursor[axis] - self.pos[i]) {
+                        self.pos[i] =
+                            @as(isize, cursor[axis]) - self.dim[i];
+                    }
+                } else {
+                    if (self.pos[i] < cursor[axis]) {
+                        self.pos[i] = cursor[axis];
+                    } else if (cursor[axis] < self.pos[i] - self.dim[i]) {
+                        self.pos[i] =
+                            cursor[axis] + self.dim[i];
+                    }
                 }
             }
         }
@@ -95,6 +137,7 @@ pub const CtlInput = union(enum) {
     moveCamera: DirectionEnum,
     expandCamera: DirectionEnum,
     retractCamera: DirectionEnum,
+    flipCamera: Axis,
     nextBlock: struct {},
     prevBlock: struct {},
     nextRotate: struct {},
@@ -207,7 +250,8 @@ pub fn update(
             newctl.input_count = ctl.input_count +| 1;
             newctl.last_input = input;
         },
-        .moveCursor => |de| if (de.inbounds_arr(
+        .moveCursor => |de| if (newctl.camera.perspective_de(de)
+            .inbounds_arr(
             u8,
             newctl.cursor,
             [_]u8{ sim.depth, sim.height, sim.width },
@@ -216,7 +260,8 @@ pub fn update(
             newctl.camera.mut_follow_cursor(newctl.cursor);
         },
         .moveCamera => |de| newctl.camera.pos =
-            de.add_sat_arr(isize, newctl.camera.pos),
+            newctl.camera.perspective_de(de)
+            .add_sat_arr(isize, newctl.camera.pos),
         .expandCamera => |de| {
             const dec_val: u1 = switch (de) {
                 .Above, .Below => 0,
@@ -244,6 +289,18 @@ pub fn update(
             };
             newctl.camera.pos[i] += inc_val;
             newctl.camera.dim[i] -|= 1;
+        },
+        .flipCamera => |axis| {
+            const i = @enumToInt(axis);
+            const should_add = switch (newctl.camera.dir[i]) {
+                .Above, .Down, .Right => true,
+                .Below, .Up, .Left => false,
+            };
+            newctl.camera.pos[i] = if (should_add)
+                newctl.camera.pos[i] + newctl.camera.dim[i]
+            else
+                newctl.camera.pos[i] - newctl.camera.dim[i];
+            newctl.camera.dir[i] = newctl.camera.dir[i].back();
         },
         .nextBlock => newctl.curr_block =
             (newctl.curr_block +% 1) % CtlState.blks_len,
@@ -301,7 +358,7 @@ pub fn draw(
     defer alloc.free(line_buffer);
 
     var screen_above_iter = DirPosIter(isize).init(
-        DirectionEnum.Above,
+        camera.dir[0],
         .{ sim.depth, sim.height, sim.width },
         camera.pos,
         camera.dim[0] + 1,
@@ -309,7 +366,7 @@ pub fn draw(
 
     while (try screen_above_iter.next_ib_pos()) |k_ib_pos| {
         var screen_down_iter = DirPosIter(isize).init(
-            DirectionEnum.Down,
+            camera.dir[1],
             .{ sim.depth, sim.height, sim.width },
             k_ib_pos.pos,
             camera.dim[1] + 1,
@@ -326,7 +383,7 @@ pub fn draw(
             };
             { // build line_buffer
                 var screen_right_iter = DirPosIter(isize).init(
-                    DirectionEnum.Right,
+                    camera.dir[2],
                     .{ sim.depth, sim.height, sim.width },
                     jpos,
                     camera.dim[2] + 1,
@@ -338,7 +395,10 @@ pub fn draw(
                         if (i_ib_pos.inbounds)
                     blk: {
                         const ipos = i_ib_pos.uint_pos();
-                        const b = state.block_grid[ipos[0]][ipos[1]][ipos[2]];
+                        const b =
+                            ctl.camera.block_with_perspective(
+                            state.block_grid[ipos[0]][ipos[1]][ipos[2]],
+                        );
                         const this_power = state.power_grid[ipos[0]][ipos[1]][ipos[2]];
                         break :blk sim.render_block(b, this_power);
                     } else .{
@@ -351,8 +411,16 @@ pub fn draw(
 
             try writer.print("|", .{});
             if (jpos[0] == ctl.cursor[0] and jpos[1] == ctl.cursor[1]) {
-                for (line_buffer, 0..) |x, i| {
-                    if (jpos[2] + @intCast(isize, i) == ctl.cursor[2]) {
+                var screen_right_iter = DirPosIter(isize).init(
+                    camera.dir[2],
+                    .{ sim.depth, sim.height, sim.width },
+                    jpos,
+                    camera.dim[2] + 1,
+                );
+                for (line_buffer) |x| {
+                    const ipos =
+                        (screen_right_iter.next_ib_pos() catch unreachable).?.pos;
+                    if (ipos[2] == ctl.cursor[2]) {
                         try writer.print("{s: ^2}x|", .{x.up_row[0..2]});
                     } else {
                         try writer.print("{s: ^3}|", .{x.up_row});
@@ -399,12 +467,22 @@ pub fn draw(
         .{ ctl.camera.pos[0], ctl.camera.pos[1], ctl.camera.pos[2] },
     );
     try writer.print(
-        "= > rot: o: above({d:0>2}) v: down ({d:0>2}) >: right({d:0>2})\n",
-        .{ ctl.camera.dim[0] + 1, ctl.camera.dim[1] + 1, ctl.camera.dim[2] + 1 },
+        "= > rot: o: {s: <5}({d:0>2}) v: {s: <5}({d:0>2}) >: {s: <5}({d:0>2})\n",
+        .{
+            @tagName(ctl.camera.dir[0]),
+            ctl.camera.dim[0] + 1,
+            @tagName(ctl.camera.dir[1]),
+            ctl.camera.dim[1] + 1,
+            @tagName(ctl.camera.dir[2]),
+            ctl.camera.dim[2] + 1,
+        },
+    );
+    const curr_block_state = ctl.camera.block_with_perspective(
+        ctl.block_state[ctl.curr_block],
     );
     try writer.print(
         "= curr_block ({d}): {}\n",
-        .{ ctl.curr_block, ctl.block_state[ctl.curr_block] },
+        .{ ctl.curr_block, curr_block_state },
     );
 
     try print_repeat_ln(writer, "=", .{}, line_width * 4 + 1);
