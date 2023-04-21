@@ -338,7 +338,7 @@ They are subdivided in:
 ## Simulation
 
 ### (No) Pistons/Sticky Pistons
-### LED block
+### Comparator/Subtractor Block
 
 ## Environment
 
