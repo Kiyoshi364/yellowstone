@@ -108,6 +108,8 @@ fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
             'J' => break .{ .expandCamera = .Down },
             'K' => break .{ .retractCamera = .Up },
             'L' => break .{ .expandCamera = .Right },
+            'U' => break .{ .expandCamera = .Above },
+            'I' => break .{ .retractCamera = .Below },
             'n' => break .{ .nextBlock = .{} },
             'p' => break .{ .prevBlock = .{} },
             '.' => break .{ .nextRotate = .{} },
