@@ -93,6 +93,18 @@ pub const DirectionEnum = enum(u3) {
             null;
     }
 
+    pub fn toAxis(self: DirectionEnum) Axis {
+        return switch (self) {
+            .Above, .Below => .z,
+            .Up, .Down => .y,
+            .Right, .Left => .x,
+        };
+    }
+
+    pub fn axis(self: DirectionEnum) u2 {
+        return @enumToInt(self.toAxis());
+    }
+
     pub fn add(
         self: DirectionEnum,
         comptime Uint: type,
@@ -200,6 +212,12 @@ pub const DirectionEnum = enum(u3) {
     ) ?[3]Uint {
         return self.inbounds(Uint, pos[0], pos[1], pos[2], bounds);
     }
+};
+
+pub const Axis = enum(u2) {
+    z = 0,
+    y = 1,
+    x = 2,
 };
 
 pub const directions = [_]Direction{ ABOVE, UP, RIGHT, DOWN, LEFT, BELOW };

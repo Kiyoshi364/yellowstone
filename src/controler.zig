@@ -15,6 +15,11 @@ const Block = block.Block;
 const BlockType = block.BlockType;
 const Repeater = block.Repeater;
 
+const Uisize = @Type(.{ .Int = .{
+    .bits = @typeInfo(isize).Int.bits - 1,
+    .signedness = .unsigned,
+} });
+
 pub const controler = lib_sim.Sandboxed(CtlState, CtlInput){
     .update = update,
 };
@@ -34,7 +39,7 @@ const starting_block_state = [_]Block{
 
 const Camera = struct {
     pos: [3]isize = .{ 0, 0, 0 },
-    dim: [3]usize = .{ 0, 7, 15 },
+    dim: [3]Uisize = .{ 0, 7, 15 },
 
     fn is_cursor_inside(self: Camera, cursor: [3]u8) bool {
         return (self.pos[0] <= cursor[0] and
@@ -57,7 +62,7 @@ const Camera = struct {
                     self.pos[i] = cursor[i];
                 } else if (self.dim[i] <= cursor[i] - self.pos[i]) {
                     self.pos[i] =
-                        cursor[i] - @intCast(isize, self.dim[i]);
+                        cursor[i] - self.dim[i];
                 }
             }
         }
