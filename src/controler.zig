@@ -39,6 +39,8 @@ const starting_block_state = [_]Block{
 };
 
 const Camera = struct {
+    const max_dim = .{ 15, 31, 31 };
+
     pos: [3]isize = .{ 0, 0, 0 },
     dim: [3]Uisize = .{ 0, 7, 15 },
     axi: [3]struct { axis: Axis, is_p: bool } = .{
@@ -255,7 +257,11 @@ pub fn update(
         .moveCamera => |de| newctl.camera.pos =
             newctl.camera.perspective_de(de)
             .add_sat_arr(isize, newctl.camera.pos),
-        .expandCamera => |de| {
+        .expandCamera => |de| if (de.inbounds_arr(
+            Uisize,
+            newctl.camera.dim,
+            Camera.max_dim,
+        )) |_| {
             const dec_val: u1 = @boolToInt(
                 newctl.camera.perspective_de(de).is_negative(),
             );
@@ -263,13 +269,17 @@ pub fn update(
             newctl.camera.pos[i] -= dec_val;
             newctl.camera.dim[i] += 1;
         },
-        .retractCamera => |de| {
+        .retractCamera => |de| if (de.back().inbounds_arr(
+            Uisize,
+            newctl.camera.dim,
+            Camera.max_dim,
+        )) |_| {
             const inc_val: u1 = @boolToInt(
                 newctl.camera.perspective_de(de).is_negative(),
             );
             const i: usize = de.axis();
             newctl.camera.pos[i] += inc_val;
-            newctl.camera.dim[i] -|= 1;
+            newctl.camera.dim[i] -= 1;
         },
         .flipCamera => |axis| {
             newctl.camera.axi[@enumToInt(axis)].is_p =
