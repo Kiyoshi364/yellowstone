@@ -133,6 +133,7 @@ pub const CtlInput = union(enum) {
     expandCamera: DirectionEnum,
     retractCamera: DirectionEnum,
     flipCamera: Axis,
+    swapDimCamera: Axis,
     nextBlock: struct {},
     prevBlock: struct {},
     nextRotate: struct {},
@@ -284,6 +285,18 @@ pub fn update(
         .flipCamera => |axis| {
             newctl.camera.axi[@enumToInt(axis)].is_p =
                 !newctl.camera.axi[@enumToInt(axis)].is_p;
+        },
+        .swapDimCamera => |axis| {
+            const i = @enumToInt(axis);
+            if (i == 0) {
+                const temp = newctl.camera.axi[1];
+                newctl.camera.axi[1] = newctl.camera.axi[2];
+                newctl.camera.axi[2] = temp;
+            } else {
+                const temp = newctl.camera.axi[0];
+                newctl.camera.axi[0] = newctl.camera.axi[i];
+                newctl.camera.axi[i] = temp;
+            }
         },
         .nextBlock => newctl.curr_block =
             (newctl.curr_block +% 1) % CtlState.blks_len,
