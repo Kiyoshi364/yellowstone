@@ -229,6 +229,14 @@ pub const Axis = enum(u2) {
     z = 0,
     y = 1,
     x = 2,
+
+    pub fn to_de(axis: Axis, is_pos: bool) DirectionEnum {
+        return switch (axis) {
+            .z => if (is_pos) .Above else .Below,
+            .y => if (is_pos) .Down else .Up,
+            .x => if (is_pos) .Right else .Left,
+        };
+    }
 };
 
 pub const directions = [_]Direction{ ABOVE, UP, RIGHT, DOWN, LEFT, BELOW };
