@@ -223,6 +223,20 @@ pub const DirectionEnum = enum(u3) {
     ) ?[3]Uint {
         return self.inbounds(Uint, pos[0], pos[1], pos[2], bounds);
     }
+
+    pub fn others(
+        self: DirectionEnum,
+        buffer: *[DirectionEnum.count]DirectionEnum,
+    ) []DirectionEnum {
+        var i = @as(u3, 0);
+        for (std.meta.tags(DirectionEnum)) |de| {
+            if (self != de) {
+                buffer[i] = de;
+                i += 1;
+            }
+        }
+        return buffer[0..i];
+    }
 };
 
 pub const Axis = enum(u2) {
@@ -275,19 +289,4 @@ pub fn inbounds_arr(
             ret[i] = ov[0];
         }
     } else ret;
-}
-
-pub fn others(
-    self: Direction,
-    buffer: *[DirectionEnum.count]Direction,
-) []Direction {
-    var i = @as(u3, 0);
-    for (std.meta.tags(DirectionEnum)) |de| {
-        const d = de.toDirection();
-        if (!std.meta.eql(self, d)) {
-            buffer[i] = d;
-            i += 1;
-        }
-    }
-    return buffer[0..i];
 }

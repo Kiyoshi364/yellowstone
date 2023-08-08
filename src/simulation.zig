@@ -144,8 +144,8 @@ pub fn update(
                     // output was the same.
                     // But we don't have this information
                     // (only what we will output now)
-                    var buffer = @as([DirectionEnum.count]Direction, undefined);
-                    for (b.facing().?.back().toDirection().others(&buffer)) |d| {
+                    var buffer = @as([DirectionEnum.count]DirectionEnum, undefined);
+                    for (b.facing().?.back().others(&buffer)) |d| {
                         if (d.inbounds_arr(
                             usize,
                             pos,
