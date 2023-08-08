@@ -23,13 +23,7 @@ pub const DirectionEnum = enum(u3) {
 
     pub const count = 6;
 
-    pub const directions = blk: {
-        var ds = @as([count]DirectionEnum, undefined);
-        for (Direction.directions, 0..) |d, i| {
-            ds[i] = fromDirection(d).?;
-        }
-        break :blk ds;
-    };
+    pub const directions = [_]DirectionEnum{ .Above, .Up, .Right, .Down, .Left, .Below };
 
     pub fn next(self: DirectionEnum) DirectionEnum {
         return switch (self) {
@@ -73,24 +67,6 @@ pub const DirectionEnum = enum(u3) {
             .Left => LEFT,
             .Below => BELOW,
         };
-    }
-
-    pub fn fromDirection(d: Direction) ?DirectionEnum {
-        const eql = std.meta.eql;
-        return if (eql(d, ABOVE))
-            .Above
-        else if (eql(d, UP))
-            .Up
-        else if (eql(d, RIGHT))
-            .Right
-        else if (eql(d, DOWN))
-            .Down
-        else if (eql(d, LEFT))
-            .Left
-        else if (eql(d, BELOW))
-            .Below
-        else
-            null;
     }
 
     pub fn toAxis(self: DirectionEnum) Axis {
@@ -252,41 +228,3 @@ pub const Axis = enum(u2) {
         };
     }
 };
-
-pub const directions = [_]Direction{ ABOVE, UP, RIGHT, DOWN, LEFT, BELOW };
-
-pub fn inbounds(
-    self: Direction,
-    comptime Uint: type,
-    z: Uint,
-    y: Uint,
-    x: Uint,
-    bounds: [3]Uint,
-) ?[3]Uint {
-    return inbounds_arr(self, Uint, [_]Uint{ z, y, x }, bounds);
-}
-
-pub fn inbounds_arr(
-    self: Direction,
-    comptime Uint: type,
-    pos: [3]Uint,
-    bounds: [3]Uint,
-) ?[3]Uint {
-    if (@typeInfo(Uint) != .Int) {
-        @compileError("Expected int type, found '" ++ @typeName(Uint) ++ "'");
-    }
-    var ret = @as([3]Uint, undefined);
-    return inline for (pos, 0..) |v, i| {
-        const ov = switch (@field(self, .{ "z", "y", "x" }[i])) {
-            0 => @addWithOverflow(v, 0),
-            -1 => @subWithOverflow(v, 1),
-            1 => @addWithOverflow(v, 1),
-            -2 => unreachable,
-        };
-        if (ov[1] != 0 or ov[0] < 0 or bounds[i] <= ov[0]) {
-            break null;
-        } else {
-            ret[i] = ov[0];
-        }
-    } else ret;
-}

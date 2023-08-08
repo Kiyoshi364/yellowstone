@@ -8,7 +8,7 @@ const Block = block.Block;
 
 const Direction = @import("Direction.zig");
 const DirectionEnum = Direction.DirectionEnum;
-const directions = Direction.directions;
+const directions = DirectionEnum.directions;
 
 const power = @import("power.zig");
 const Power = power.Power;
@@ -179,8 +179,8 @@ pub fn update(
                     },
                     .negator => power.NEGATOR_POWER,
                 };
-                for (directions) |d| {
-                    if (d.inbounds(usize, i.z, i.y, i.x, bounds)) |npos| {
+                for (directions) |de| {
+                    if (de.inbounds(usize, i.z, i.y, i.x, bounds)) |npos| {
                         try mod_stack.append(npos);
                     }
                 }
@@ -346,15 +346,15 @@ fn update_wire(
 ) Allocator.Error!void {
     std.debug.assert(b == .wire);
     var this_power = Power.empty;
-    for (directions) |d| {
+    for (directions) |de| {
         std.debug.assert(0 <= @enumToInt(this_power));
-        if (d.inbounds(usize, z, y, x, bounds)) |npos| {
+        if (de.inbounds(usize, z, y, x, bounds)) |npos| {
             const nz = npos[0];
             const ny = npos[1];
             const nx = npos[2];
             const that_block = newstate.block_grid[nz][ny][nx];
             const that_power = look_at_power(
-                DirectionEnum.fromDirection(d).?,
+                de,
                 that_block,
                 newstate.power_grid[nz][ny][nx],
             ) catch |err| switch (err) {
@@ -399,8 +399,8 @@ fn update_wire(
     }
     if (this_power != newstate.power_grid[z][y][x]) {
         newstate.power_grid[z][y][x] = this_power;
-        for (directions) |d| {
-            if (d.inbounds(usize, z, y, x, bounds)) |npos| {
+        for (directions) |de| {
+            if (de.inbounds(usize, z, y, x, bounds)) |npos| {
                 try mod_stack.append(npos);
             }
         }
@@ -417,17 +417,17 @@ fn update_block_or_led(
 ) Allocator.Error!void {
     std.debug.assert(b == .block or b == .led);
     var this_power = power.BLOCK_OFF_POWER;
-    for (directions) |d| {
+    for (directions) |de| {
         std.debug.assert(this_power == power.BLOCK_OFF_POWER or
             this_power == power.BLOCK_ON_POWER or
             this_power == power.SOURCE_POWER);
-        if (d.inbounds(usize, z, y, x, bounds)) |npos| {
+        if (de.inbounds(usize, z, y, x, bounds)) |npos| {
             const nz = npos[0];
             const ny = npos[1];
             const nx = npos[2];
             const that_block = newstate.block_grid[nz][ny][nx];
             const that_power = look_at_power(
-                DirectionEnum.fromDirection(d).?,
+                de,
                 that_block,
                 newstate.power_grid[nz][ny][nx],
             ) catch |err| switch (err) {
@@ -473,8 +473,8 @@ fn update_block_or_led(
     }
     if (this_power != newstate.power_grid[z][y][x]) {
         newstate.power_grid[z][y][x] = this_power;
-        for (directions) |d| {
-            if (d.inbounds(usize, z, y, x, bounds)) |npos| {
+        for (directions) |de| {
+            if (de.inbounds(usize, z, y, x, bounds)) |npos| {
                 try mod_stack.append(npos);
             }
         }
