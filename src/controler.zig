@@ -35,6 +35,7 @@ const starting_block_state = [_]Block{
     .{ .repeater = Repeater.init(.Up, .two) },
     .{ .repeater = Repeater.init(.Up, .three) },
     .{ .repeater = Repeater.init(.Up, .four) },
+    .{ .comparator = .{} },
     .{ .negator = .{} },
 };
 

@@ -122,9 +122,11 @@ pub fn update(
                 .block,
                 .led,
                 => {},
-                .repeater => {
+                .repeater,
+                .comparator,
+                => {
                     // Note: here should be a great place
-                    // to "do nothing" if repeater's
+                    // to "do nothing" if the machine's
                     // output was the same.
                     // But we don't have this information
                     // (only what we will output now)
@@ -177,6 +179,7 @@ pub fn update(
                         std.debug.assert(r.is_valid());
                         break :blk power.REPEATER_POWER;
                     },
+                    .comparator => power.COMPARATOR_POWER,
                     .negator => power.NEGATOR_POWER,
                 };
                 for (directions) |de| {
@@ -188,6 +191,7 @@ pub fn update(
                     .empty,
                     .source,
                     .repeater,
+                    .comparator,
                     .negator,
                     => false,
                     .wire,
@@ -249,6 +253,13 @@ pub fn update(
                     std.debug.assert(repeater_is_ok);
                     std.debug.assert(r.is_valid());
                 },
+                .comparator => {
+                    const comparator_is_ok = std.meta.eql(
+                        power.COMPARATOR_POWER,
+                        newstate.power_grid[z][y][x],
+                    );
+                    std.debug.assert(comparator_is_ok);
+                },
                 .negator => {
                     const negator_is_ok = std.meta.eql(
                         power.NEGATOR_POWER,
@@ -289,11 +300,82 @@ pub fn update(
                 break :blk switch (that_power) {
                     .empty => 0,
                     .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => 1,
-                    .source, .repeater, .negator => 1,
+                    .source, .repeater, .comparator, .negator => 1,
                     _ => unreachable,
                 };
             } else 0;
             newstate.block_grid[z][y][x] = .{ .repeater = rep.shift(curr_in) };
+        }
+    }
+
+    if (should_step) { // For each comparator, shift input
+        var block_it = State.BlockIter{};
+        while (block_it.next_pos()) |pos| {
+            const z = pos[0];
+            const y = pos[1];
+            const x = pos[2];
+            const b = newstate.block_grid[z][y][x];
+            if (b != .comparator) continue;
+            const comp = b.comparator;
+            const back_dir = comp.facing.back();
+            const curr_in: u4 =
+                if (back_dir.inbounds_arr(usize, pos, bounds)) |bpos|
+            blk: {
+                const that_power = look_at_power(
+                    back_dir,
+                    newstate.block_grid[bpos[0]][bpos[1]][bpos[2]],
+                    newstate.power_grid[bpos[0]][bpos[1]][bpos[2]],
+                ) catch |err| switch (err) {
+                    error.InvalidPower => {
+                        std.debug.print(
+                            "this: (z: {}, y: {}, x: {}) b: {} - that: (z: {}, y: {}, x: {}) b:{} p: {}\n",
+                            .{ z, y, x, b, bpos[0], bpos[1], bpos[2], newstate.block_grid[bpos[0]][bpos[1]][bpos[2]], newstate.power_grid[bpos[0]][bpos[1]][bpos[2]] },
+                        );
+                        unreachable;
+                    },
+                };
+                break :blk @intCast(u4, switch (that_power) {
+                    .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => @enumToInt(that_power),
+                    .source, .repeater, .negator => 15,
+                    .comparator => unreachable,
+                    _ => unreachable,
+                });
+            } else 0;
+            const highest_side: u4 = blk: {
+                var h = @as(u4, 0);
+                var buffer = @as([DirectionEnum.count]DirectionEnum, undefined);
+                for (back_dir.others(&buffer)) |de| {
+                    if (std.meta.eql(de, comp.facing)) {
+                        continue;
+                    }
+                    if (de.inbounds_arr(usize, pos, bounds)) |bpos| {
+                        const that_power = look_at_power(
+                            de,
+                            newstate.block_grid[bpos[0]][bpos[1]][bpos[2]],
+                            newstate.power_grid[bpos[0]][bpos[1]][bpos[2]],
+                        ) catch |err| switch (err) {
+                            error.InvalidPower => {
+                                std.debug.print(
+                                    "this: (z: {}, y: {}, x: {}) b: {} - that: (z: {}, y: {}, x: {}) b:{} p: {}\n",
+                                    .{ z, y, x, b, bpos[0], bpos[1], bpos[2], newstate.block_grid[bpos[0]][bpos[1]][bpos[2]], newstate.power_grid[bpos[0]][bpos[1]][bpos[2]] },
+                                );
+                                unreachable;
+                            },
+                        };
+                        const side = @intCast(u4, switch (that_power) {
+                            .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => @enumToInt(that_power),
+                            .source, .repeater, .negator => 15,
+                            .comparator => unreachable,
+                            _ => unreachable,
+                        });
+                        if (h < side) {
+                            h = side;
+                        }
+                    }
+                }
+                break :blk h;
+            };
+            newstate.block_grid[z][y][x] = .{ .comparator = comp.shift(curr_in, highest_side) };
         }
     }
 
@@ -326,7 +408,7 @@ pub fn update(
                 break :blk switch (that_power) {
                     .empty => 0,
                     .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => 1,
-                    .source, .repeater, .negator => 1,
+                    .source, .repeater, .comparator, .negator => 1,
                     else => unreachable,
                 };
             } else 0;
@@ -393,6 +475,7 @@ fn update_wire(
                     )
                 else
                     this_power,
+                .comparator => unreachable,
                 _ => unreachable,
             };
         }
@@ -450,7 +533,8 @@ fn update_block_or_led(
                 .one => blk: {
                     std.debug.assert(that_block == .wire or
                         that_block == .block or
-                        that_block == .led);
+                        that_block == .led or
+                        that_block == .comparator);
                     break :blk if (this_power == power.BLOCK_OFF_POWER)
                         if (that_block == .block or
                             that_block == .led)
@@ -467,6 +551,7 @@ fn update_block_or_led(
                     else
                         this_power;
                 },
+                .comparator => unreachable,
                 _ => unreachable,
             };
         }
@@ -506,6 +591,21 @@ fn look_at_power(
             else
                 Power.zero;
         },
+        .comparator => blk: {
+            std.debug.assert(b == .comparator);
+            const next_out = b.comparator.next_out();
+            const is_facing_me = std.meta.eql(
+                from_de,
+                b.facing().?.back(),
+            );
+            break :blk if (next_out > 0 and is_facing_me)
+                @intToEnum(
+                    Power,
+                    @as(i5, next_out) +% 1,
+                )
+            else
+                Power.zero;
+        },
         .negator => blk: {
             std.debug.assert(b == .negator);
             const is_on = b.negator.is_on();
@@ -531,6 +631,9 @@ fn default_render_block(b: Block, this_power: Power) DrawBlock {
         if (power_index == power.REPEATER_POWER.to_index()) {
             std.debug.assert(b == .repeater);
             break :blk char_powers[b.repeater.get_memory()];
+        } else if (power_index == power.COMPARATOR_POWER.to_index()) {
+            std.debug.assert(b == .comparator);
+            break :blk char_powers[b.comparator.memory];
         } else if (power_index == power.NEGATOR_POWER.to_index()) {
             std.debug.assert(b == .negator);
             break :blk char_powers[b.negator.memory];
@@ -545,10 +648,11 @@ fn default_render_block(b: Block, this_power: Power) DrawBlock {
         .block => @as(u8, 'B'),
         .led => @as(u8, 'L'),
         .repeater => @as(u8, 'r'),
+        .comparator => @as(u8, 'c'),
         .negator => @as(u8, 'n'),
     };
     const c_info = switch (b) {
-        .empty, .source, .wire, .block, .led, .negator => @as(u8, ' '),
+        .empty, .source, .wire, .block, .led, .comparator, .negator => @as(u8, ' '),
         .repeater => |r| "1234"[@enumToInt(r.get_delay())],
     };
     const char_dirs = @as(*const [6]u8, "o^>v<x");

@@ -29,7 +29,8 @@ pub const Power = enum(PowerInt) {
 
     source = -16,
     repeater = -15,
-    negator = -14,
+    comparator = -14,
+    negator = -13,
     _,
 
     pub fn to_index(self: Power) usize {
@@ -55,6 +56,7 @@ pub const Power = enum(PowerInt) {
 pub const EMPTY_POWER = Power.empty;
 pub const SOURCE_POWER = Power.source;
 pub const REPEATER_POWER = Power.repeater;
+pub const COMPARATOR_POWER = Power.comparator;
 pub const NEGATOR_POWER = Power.negator;
 
 pub const FROM_SOURCE_POWER = Power.fifteen;

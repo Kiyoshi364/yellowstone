@@ -4,6 +4,7 @@ const Direction = @import("Direction.zig");
 const DirectionEnum = Direction.DirectionEnum;
 
 pub const Repeater = @import("repeater.zig").Repeater;
+pub const Comparator = @import("comparator.zig").Comparator;
 pub const Negator = @import("negator.zig").Negator;
 
 pub const BlockType = enum(u4) {
@@ -13,6 +14,7 @@ pub const BlockType = enum(u4) {
     block,
     led,
     repeater,
+    comparator,
     negator,
 };
 
@@ -23,6 +25,7 @@ pub const Block = union(BlockType) {
     block: struct {},
     led: struct {},
     repeater: Repeater,
+    comparator: Comparator,
     negator: Negator,
 
     pub fn facing(self: Block) ?DirectionEnum {
@@ -34,7 +37,8 @@ pub const Block = union(BlockType) {
             .led,
             => null,
             .repeater => |r| r.facing,
-            .negator => |r| r.facing,
+            .comparator => |c| c.facing,
+            .negator => |n| n.facing,
         };
     }
 
@@ -47,7 +51,8 @@ pub const Block = union(BlockType) {
             .led,
             => self,
             .repeater => |r| .{ .repeater = r.with_facing(de) },
-            .negator => |r| .{ .negator = r.with_facing(de) },
+            .comparator => |c| .{ .comparator = c.with_facing(de) },
+            .negator => |n| .{ .negator = n.with_facing(de) },
         };
     }
 
@@ -56,6 +61,9 @@ pub const Block = union(BlockType) {
             .empty, .source, .wire, .block, .led => self,
             .repeater => |r| .{
                 .repeater = r.with_facing(r.facing.next()),
+            },
+            .comparator => |c| .{
+                .comparator = c.with_facing(c.facing.next()),
             },
             .negator => |n| .{
                 .negator = n.with_facing(n.facing.next()),
@@ -68,6 +76,9 @@ pub const Block = union(BlockType) {
             .empty, .source, .wire, .block, .led => self,
             .repeater => |r| .{
                 .repeater = r.with_facing(r.facing.prev()),
+            },
+            .comparator => |c| .{
+                .comparator = c.with_facing(c.facing.prev()),
             },
             .negator => |n| .{
                 .negator = n.with_facing(n.facing.prev()),
@@ -92,6 +103,10 @@ pub const Block = union(BlockType) {
                 "1234"[@enumToInt(r.get_delay())],
                 "o^>v<x"[@enumToInt(r.facing)],
                 "0123456789abcdef"[r.get_memory()],
+            }),
+            .comparator => |c| fmt(writer, "c{c}{c}", .{
+                "o^>v<x"[@enumToInt(c.facing)],
+                "0123456789abcdef"[c.memory],
             }),
             .negator => |n| fmt(writer, "n{c}{c}", .{
                 "o^>v<x"[@enumToInt(n.facing)],

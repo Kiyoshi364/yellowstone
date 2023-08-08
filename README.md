@@ -54,6 +54,7 @@ See: ([downloads page](https:ziglang.org/download))
 |Block|`'B'`|Any Solid Block|Can be powered, limits power transportation|-|
 |LED|`'L'`|Redstone Lamp|Similar to Block, but render diffentently when on power|-|
 |Repeater|`'r'`|Repeater|Extends power transportation|Cannot be "locked"|
+|Comparator|`'c'`|Comparator|Lets power through if higher or equal than from the sides|Cannot pass power throught Block and LED|
 |Negator|`'n'`|Redstone Torch|Negates power|-|
 
 ---
@@ -62,11 +63,11 @@ See: ([downloads page](https:ziglang.org/download))
 Each tile is rendered as a 3x3 text (ignoring tile boundaries).
 Some tiles examples:
 ```console
-+---+---+---+---+---+---+---+---+
-|   |   |   |  x|   |***|   | ^ |
-|   | S | w | w | B |***| r>| n |
-|   |*  |f  |e  |1  |***|1 1|1  |
-+---+---+---+---+---+---+---+---+
++---+---+---+---+---+---+---+---+---+
+|   |   |   |  x|   |***|   |o  | ^ |
+|   | S | w | w | B |***| r>| c | n |
+|   |*  |f  |e  |1  |***|1 1|6  |1  |
++---+---+---+---+---+---+---+---+---+
 ```
 
 > **Note:**
@@ -87,6 +88,7 @@ where:
 * `p`: current power (one of " 12456789abcdef*")
   * `*` means that it is a source
   * for Repeater is its memory (related to delay)
+  * for Comparator is input that will output
   * for Negator is input that was read
 * `i`: information
   * for Repeater is its delay (one of "1234")
@@ -341,7 +343,7 @@ They are subdivided in:
 ## Simulation
 
 ### (No) Pistons/Sticky Pistons
-### Comparator/Subtractor Block
+### Subtractor Block
 
 ## Environment
 
