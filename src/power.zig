@@ -78,3 +78,7 @@ test "static asserts for constants" {
         FROM_SOURCE_POWER,
     );
 }
+
+pub const InvalidPowerError = error{
+    InvalidPower,
+};
