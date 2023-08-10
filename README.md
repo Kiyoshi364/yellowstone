@@ -345,15 +345,57 @@ They are subdivided in:
 ## Simulation
 
 ### (No) Pistons/Sticky Pistons
+
+A thought on rules for how Pistons work.
+Or a "proof"/good argument saying
+that they aren't worth adding.
+
 ### Subtractor Block
 
+Something similar to
+comparator on subtract mode from Minecraft.
+
+---
 ## Environment
 
 ### Copy and Paste (Stacking)
-### File format text and binary (Serialization/Deserialization)
+
+Ability to select a rectangle/box then:
+* copy/paste/move it,
+* set all to same block
+* ...
+
+This should ease construction of circuits
+
+### File format text and/or binary (Serialization/Deserialization)
+
+Especify a way (maybe two ways) of
+describing a state and inputs
+in a file.
+
+This allows to load/write a circuit and inputs
+from/to a file. Good things:
+* save circuit to disk
+* show examples (send them to other people)
+* a step towards record/replay
+  * write tests
+
 ### Support to Other Plataforms
+
+Because the simulation is a separate thing,
+it could be "easily" ported to other plataforms, like:
+* Window/Graphics stuff (GUI)
+* [Wasm4](https://wasm4.org)
+* Smartphones
+* ...
+
+---
 ### Config/(Re)map file format
 
+Have a config file to (re)map buttons
+(see `# Interactive Controls`)
+
+---
 ## Implementation
 
 ### Event List hold unique positions
