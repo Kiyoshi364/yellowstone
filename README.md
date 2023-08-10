@@ -197,7 +197,7 @@ for the simulation to have;
 it brings a notion of positional symmetry
 to the simulation.
 
-> _(Yes! At the end the important stuff is beauty!)_
+> _(Yes! At the end, the important stuff is beauty!)_
 
 ---
 ### (2) Determinism
@@ -221,7 +221,7 @@ For the record, I believe that Minecraft has this property
 (but without any strong evidence about it).
 Usually, if a simulation does not have it,
 it is either a intetional thing or
-someone messed something really hard
+someone messed something really hard.
 
 Also, just being deterministic is not enough,
 it has to look deterministic:
@@ -315,9 +315,11 @@ and are not immediately obvious to newcomers.
 
 Arguably this entire section could be erased,
 because they offend another design rule
-(I'll not talk about it for now, it is already really big),
+(namelly, 1,2 - Position Invariance, 4 - Determinism)
+(I'll not extend it for now, it is already really big),
 being the 3rd one (_Kind/Type of block_) the least offender.
-The main reason it's there is to ease
+
+The main reason this decision is there is to ease
 the conflicting principles on how to introduce pistons,
 currently I have no ideia how to make it work.
 
@@ -331,10 +333,10 @@ They are subdivided in:
 * Simulation: new features, blocks, interactions, ...;
   stuff related to the simulation itself.
 * Environment: "stack blocks", record/replay, run on smartphone, ...;
-  user interaction outside of simutalion itself.
+  user interaction outside of simulation itself.
 * Implementation: runs faster, less memory, more efficient, ...;
   changes here should not consern "normal users" besides
-  performance reasons.
+  performance (speed/memory) reasons.
 
 > _Note:_ for now the sections are empty.
 > There should be an explanation in the future.
