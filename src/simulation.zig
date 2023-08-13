@@ -566,6 +566,15 @@ fn update_block_or_led(
     }
 }
 
+// TODO: Fix following bug
+// BUG: "delayed machines" don't save their current output,
+//    so if a block gets updated by the input (without stepping)
+//    it can't read the current output and
+//    may be updated to a weird state
+//    (for example putting an empty block near a wire
+//    will cause the wire to try to update).
+//    Stepping the simulation should fix this automatically.
+//    Possible solution is to save their current output.
 fn look_at_power(
     from_de: DirectionEnum,
     b: Block,
@@ -630,13 +639,13 @@ fn default_render_block(b: Block, this_power: Power) DrawBlock {
     else blk: {
         if (power_index == power.REPEATER_POWER.to_index()) {
             std.debug.assert(b == .repeater);
-            break :blk char_powers[b.repeater.get_memory()];
+            break :blk char_powers[b.repeater.last_out];
         } else if (power_index == power.COMPARATOR_POWER.to_index()) {
             std.debug.assert(b == .comparator);
-            break :blk char_powers[b.comparator.memory];
+            break :blk char_powers[b.comparator.last_out];
         } else if (power_index == power.NEGATOR_POWER.to_index()) {
             std.debug.assert(b == .negator);
-            break :blk char_powers[b.negator.memory];
+            break :blk char_powers[b.negator.last_out];
         } else {
             unreachable;
         }
@@ -650,6 +659,12 @@ fn default_render_block(b: Block, this_power: Power) DrawBlock {
         .repeater => @as(u8, 'r'),
         .comparator => @as(u8, 'c'),
         .negator => @as(u8, 'n'),
+    };
+    const c_mem = switch (b) {
+        .empty, .source, .wire, .block, .led => @as(u8, ' '),
+        .repeater => |r| char_powers[r.get_memory()],
+        .comparator => |c| char_powers[c.memory],
+        .negator => |n| char_powers[n.memory],
     };
     const c_info = switch (b) {
         .empty, .source, .wire, .block, .led, .comparator, .negator => @as(u8, ' '),
@@ -671,9 +686,9 @@ fn default_render_block(b: Block, this_power: Power) DrawBlock {
     const below = @enumToInt(DirectionEnum.Below) % c_dirs.len;
     std.debug.assert(above == below);
     return DrawBlock{
-        .up_row = [3]u8{ c_dirs[above], c_dirs[up], ' ' },
+        .up_row = [3]u8{ c_dirs[above], c_dirs[up], c_info },
         .mid_row = [3]u8{ c_dirs[left], c_block, c_dirs[right] },
-        .bot_row = [3]u8{ c_power, c_dirs[down], c_info },
+        .bot_row = [3]u8{ c_power, c_dirs[down], c_mem },
     };
 }
 

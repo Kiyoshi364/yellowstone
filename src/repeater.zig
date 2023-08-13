@@ -73,6 +73,7 @@ pub const CanonicalRepeater = struct {
     /// Then, at the end of the update function,
     /// the current state's input will `shift`ed in.
     memory: u4 = 0,
+    last_out: u1 = 0,
 
     pub fn init(facing: DirectionEnum, delay: Delay) CanonicalRepeater {
         return .{
@@ -94,6 +95,7 @@ pub const CanonicalRepeater = struct {
             .facing = newfacing,
             .delay = r.delay,
             .memory = r.memory,
+            .last_out = r.last_out,
         };
     }
 
@@ -119,6 +121,7 @@ pub const CanonicalRepeater = struct {
             .facing = r.facing,
             .delay = r.delay,
             .memory = top_bit | (r.memory >> 1),
+            .last_out = r.next_out(),
         };
     }
 
@@ -165,6 +168,7 @@ fn test_repeater_with_facing_delay(
     var rep = RepeaterType.init(facing, delay);
     var last_seq = @as(?u4, null);
     var seq_iter = SeqIter.init(delay);
+    var last_out = @as(?u1, null);
 
     const bits = @enumToInt(delay) +% 1;
     while (seq_iter.next()) |sequence| : (last_seq = sequence) {
@@ -178,6 +182,7 @@ fn test_repeater_with_facing_delay(
             );
 
             const ls = last_seq orelse 0;
+            const lo = last_out orelse 0;
 
             const new_mask = @intCast(
                 u4,
@@ -203,11 +208,19 @@ fn test_repeater_with_facing_delay(
             );
             try std.testing.expectEqual(delay, rep.get_delay());
             try std.testing.expectEqual(mem, rep.get_memory());
+
+            try std.testing.expectEqual(
+                lo,
+                rep.last_out,
+            );
+
+            last_out = last_bit;
             rep = rep.shift(bit);
         }
     }
     { // last seq
         const ls = last_seq.?;
+        const lo = last_out.?;
         var bit_i = @as(u3, 0);
         while (bit_i <= @enumToInt(delay)) : (bit_i += 1) {
             const i = @intCast(u2, bit_i);
@@ -226,6 +239,13 @@ fn test_repeater_with_facing_delay(
                 if (last_bit == 1) true else false,
                 rep.is_on(),
             );
+
+            try std.testing.expectEqual(
+                lo,
+                rep.last_out,
+            );
+
+            last_out = last_bit;
             rep = rep.shift(bit);
         }
     }
@@ -260,6 +280,7 @@ pub const ImplicitDelayRepeater = struct {
     /// - `0b01xxx`: `.three`
     /// - `0b1xxxx`: `.four`
     data: u5 = pack_delay_mem(.one, 0),
+    last_out: u1 = 0,
 
     pub fn init(facing: DirectionEnum, delay: Delay) ImplicitDelayRepeater {
         return init_mem(facing, delay, 0);
@@ -276,6 +297,7 @@ pub const ImplicitDelayRepeater = struct {
         return .{
             .facing = newfacing,
             .data = r.data,
+            .last_out = r.last_out,
         };
     }
 
@@ -325,6 +347,7 @@ pub const ImplicitDelayRepeater = struct {
         return .{
             .facing = r.facing,
             .data = data,
+            .last_out = r.next_out(),
         };
     }
 
@@ -336,7 +359,7 @@ pub const ImplicitDelayRepeater = struct {
         return r.next_out() == 1;
     }
 
-    test "ImplicitDelayRepeater.pack and ImplicitDelayRepeater.unpack}" {
+    test "ImplicitDelayRepeater.pack and ImplicitDelayRepeater.unpack" {
         const delays = [_]Delay{ .one, .two, .three, .four };
         for (delays) |delay| {
             var seq_iter = SeqIter.init(delay);

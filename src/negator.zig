@@ -6,11 +6,13 @@ const DirectionEnum = Direction.DirectionEnum;
 pub const Negator = struct {
     facing: DirectionEnum = .Up,
     memory: u1 = 0,
+    last_out: u1 = 0,
 
     pub fn with_facing(n: Negator, newfacing: DirectionEnum) Negator {
         return .{
             .facing = newfacing,
             .memory = n.memory,
+            .last_out = n.last_out,
         };
     }
 
@@ -18,11 +20,16 @@ pub const Negator = struct {
         return .{
             .facing = n.facing,
             .memory = newmemory,
+            .last_out = n.last_out,
         };
     }
 
     pub fn shift(n: Negator, curr_in: u1) Negator {
-        return n.with_memory(curr_in);
+        return .{
+            .facing = n.facing,
+            .memory = curr_in,
+            .last_out = n.next_out(),
+        };
     }
 
     pub fn next_out(n: Negator) u1 {

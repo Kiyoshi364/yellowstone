@@ -78,21 +78,30 @@ A general tile is organized in this way:
 +---+
 |ddc|
 |dbd|
-|pdi|
+|pdm|
 +---+
 ```
 where:
 * `d`: is a direction (one of " x^>v<o")
 * `c`: marks where the cursor is (one of " x")
-* `b`: which block is there
-* `p`: current power (one of " 12456789abcdef*")
-  * `*` means that it is a source
-  * for Repeater is its memory (related to delay)
-  * for Comparator is input that will output
-  * for Negator is input that was read
-* `i`: information
   * for Repeater is its delay (one of "1234")
+* `b`: which block is there
+* `p`: current power (one of " 123456789abcdef*")
+  * `*` means that it is a source
+  * for machines is it's output
+    * for Repeater and Negator (one of " 1")
+    * for Comparator (one of " 123456789abcdef")
+* `m`: memory
+    * for Repeater "queue" of previous inputs (one of " 123456789abcdef")
+    * for Negator current input (one of " 1")
+    * for Comparator current input (one of " 123456789abcdef")
 
+---
+> **Note**: LED is represented differently
+
+> * when `b` is "L" and others are " ", it is turned off
+> * when `b` is "L" and others are "*", it is turned on
+> * when all are "*", it is turned on behaving as a Source
 
 ---
 # Interactive Controls

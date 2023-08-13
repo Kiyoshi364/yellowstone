@@ -6,11 +6,13 @@ const DirectionEnum = Direction.DirectionEnum;
 pub const Comparator = struct {
     facing: DirectionEnum = .Up,
     memory: u4 = 0,
+    last_out: u4 = 0,
 
     pub fn with_facing(c: Comparator, newfacing: DirectionEnum) Comparator {
         return .{
             .facing = newfacing,
             .memory = c.memory,
+            .last_out = c.last_out,
         };
     }
 
@@ -18,14 +20,19 @@ pub const Comparator = struct {
         return .{
             .facing = c.facing,
             .memory = newmemory,
+            .last_out = c.last_out,
         };
     }
 
     pub fn shift(c: Comparator, curr_in: u4, highest_side: u4) Comparator {
-        return if (curr_in >= highest_side)
-            c.with_memory(curr_in)
-        else
-            c.with_memory(0);
+        return .{
+            .facing = c.facing,
+            .memory = if (curr_in >= highest_side)
+                curr_in
+            else
+                0,
+            .last_out = c.next_out(),
+        };
     }
 
     pub fn next_out(c: Comparator) u4 {
