@@ -33,11 +33,8 @@ Note that zig is not released yet.
 This project is being developed with the following `zig version`:
 ```console
 $ zig version
-0.11.0-dev.2160+49d37e2d1
+0.11.0
 ```
-
-Grabing from master or version `0.11.*` should work.
-If not, following compiler errors shouldn't be hard.
 
 See: ([downloads page](https:ziglang.org/download))
 

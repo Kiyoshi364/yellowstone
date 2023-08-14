@@ -52,14 +52,14 @@ const Camera = struct {
 
     fn dir_i(
         camera: Camera,
-        i: @TypeOf(@enumToInt(Axis.z)),
+        i: @TypeOf(@intFromEnum(Axis.z)),
     ) DirectionEnum {
         const ca = camera.axi[i];
         return ca.axis.to_de(ca.is_p);
     }
 
     fn dir(camera: Camera, axis: Axis) DirectionEnum {
-        return camera.dir_i(@enumToInt(axis));
+        return camera.dir_i(@intFromEnum(axis));
     }
 
     fn perspective_de(camera: Camera, de: DirectionEnum) DirectionEnum {
@@ -117,8 +117,8 @@ pub const CtlState = struct {
     block_state: @TypeOf(starting_block_state) = starting_block_state,
     curr_block: usize = 0,
 
-    const blks_len = @intCast(
-        @typeInfo(BlockType).Enum.tag_type,
+    const blks_len: @typeInfo(BlockType).Enum.tag_type =
+        @intCast(
         @as(
             CtlState,
             undefined,
@@ -183,7 +183,7 @@ fn DirPosIter(comptime Int: type) type {
             pub fn uint_pos(self: IB_Pos) [3]Uint {
                 var ret = @as([3]Uint, undefined);
                 for (self.pos, 0..) |x, i| {
-                    ret[i] = @intCast(Uint, x);
+                    ret[i] = @intCast(x);
                 }
                 return ret;
             }
@@ -264,7 +264,7 @@ pub fn update(
             newctl.camera.dim,
             Camera.max_dim,
         )) |_| {
-            const dec_val: u1 = @boolToInt(
+            const dec_val: u1 = @intFromBool(
                 newctl.camera.perspective_de(de).is_negative(),
             );
             const i: usize = de.axis();
@@ -276,7 +276,7 @@ pub fn update(
             newctl.camera.dim,
             Camera.max_dim,
         )) |_| {
-            const inc_val: u1 = @boolToInt(
+            const inc_val: u1 = @intFromBool(
                 newctl.camera.perspective_de(de).is_negative(),
             );
             const i: usize = de.axis();
@@ -284,11 +284,11 @@ pub fn update(
             newctl.camera.dim[i] -= 1;
         },
         .flipCamera => |axis| {
-            newctl.camera.axi[@enumToInt(axis)].is_p =
-                !newctl.camera.axi[@enumToInt(axis)].is_p;
+            newctl.camera.axi[@intFromEnum(axis)].is_p =
+                !newctl.camera.axi[@intFromEnum(axis)].is_p;
         },
         .swapDimCamera => |axis| {
-            const i = @enumToInt(axis);
+            const i = @intFromEnum(axis);
             if (i == 0) {
                 const temp = newctl.camera.axi[1];
                 newctl.camera.axi[1] = newctl.camera.axi[2];
@@ -358,7 +358,7 @@ pub fn draw(
         const pos = blk2: {
             var pos = camera.pos;
             break :blk2 for (camera.axi) |ca| {
-                const i = @enumToInt(ca.axis);
+                const i = @intFromEnum(ca.axis);
                 if (ca.is_p) {
                     // Empty
                 } else {
@@ -421,9 +421,9 @@ pub fn draw(
 
             try writer.print("|", .{});
 
-            const zi = @enumToInt(camera.axi[0].axis);
-            const yi = @enumToInt(camera.axi[1].axis);
-            const xi = @enumToInt(camera.axi[2].axis);
+            const zi = @intFromEnum(camera.axi[0].axis);
+            const yi = @intFromEnum(camera.axi[1].axis);
+            const xi = @intFromEnum(camera.axi[2].axis);
             const is_cursor_in_this_line =
                 jpos[zi] == ctl.cursor[zi] and
                 jpos[yi] == ctl.cursor[yi];

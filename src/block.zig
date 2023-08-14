@@ -100,16 +100,16 @@ pub const Block = union(BlockType) {
             .block => fmt(writer, "B", .{}),
             .led => fmt(writer, "L", .{}),
             .repeater => |r| fmt(writer, "r{c}{c}{c}", .{
-                "1234"[@enumToInt(r.get_delay())],
-                "o^>v<x"[@enumToInt(r.facing)],
+                "1234"[@intFromEnum(r.get_delay())],
+                "o^>v<x"[@intFromEnum(r.facing)],
                 "0123456789abcdef"[r.get_memory()],
             }),
             .comparator => |c| fmt(writer, "c{c}{c}", .{
-                "o^>v<x"[@enumToInt(c.facing)],
+                "o^>v<x"[@intFromEnum(c.facing)],
                 "0123456789abcdef"[c.memory],
             }),
             .negator => |n| fmt(writer, "n{c}{c}", .{
-                "o^>v<x"[@enumToInt(n.facing)],
+                "o^>v<x"[@intFromEnum(n.facing)],
                 "01"[n.memory],
             }),
         };

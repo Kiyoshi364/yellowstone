@@ -34,14 +34,17 @@ pub const Power = enum(PowerInt) {
     _,
 
     pub fn to_index(self: Power) usize {
-        return @bitCast(PowerUint, @enumToInt(self));
+        return @as(PowerUint, @bitCast(@intFromEnum(self)));
     }
 
     test "to_index non-negative values" {
         var i = @as(PowerInt, 0);
         while (i >= 0) : (i +%= 1) {
-            const result = @intToEnum(Power, i).to_index();
-            try std.testing.expectEqual(@intCast(usize, i), result);
+            const result = @as(Power, @enumFromInt(i)).to_index();
+            try std.testing.expectEqual(
+                @as(usize, @intCast(i)),
+                result,
+            );
         }
     }
 
@@ -68,8 +71,8 @@ pub const BLOCK_OFF_POWER = Power.zero;
 
 test "static asserts for constants" {
     try std.testing.expectEqual(
-        @enumToInt(SOURCE_POWER),
-        @enumToInt(FROM_SOURCE_POWER) +% 1,
+        @intFromEnum(SOURCE_POWER),
+        @intFromEnum(FROM_SOURCE_POWER) +% 1,
     );
     try std.testing.expectEqual(
         FROM_REPEATER_POWER,

@@ -28,9 +28,9 @@ pub fn build(b: *std.Build) void {
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).
-    exe.install();
+    b.installArtifact(exe);
 
-    const run_cmd = exe.run();
+    const run_cmd = b.addRunArtifact(exe);
 
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| {
@@ -40,18 +40,6 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    // Creates a step for docs.
-    const main_docs = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-    main_docs.addModule("lib_sim", sim_module);
-    main_docs.emit_docs = .emit;
-
-    const docs_step = b.step("docs", "Build docs");
-    docs_step.dependOn(&main_docs.step);
-
     // Creates a step for unit testing.
     const exe_tests_lib_sim = b.addTest(.{
         .root_source_file = .{ .path = "lib_sim/simulation.zig" },
@@ -60,7 +48,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const test_lib_sim_step = b.step("test_lib_sim", "Run unit tests for lib_sim");
-    test_lib_sim_step.dependOn(&exe_tests_lib_sim.run().step);
+    test_lib_sim_step.dependOn(&b.addRunArtifact(exe_tests_lib_sim).step);
 
     const exe_tests_main = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
@@ -70,6 +58,16 @@ pub fn build(b: *std.Build) void {
     exe_tests_main.addModule("lib_sim", sim_module);
 
     const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&exe_tests_main.run().step);
+    test_step.dependOn(&b.addRunArtifact(exe_tests_main).step);
     test_step.dependOn(test_lib_sim_step);
+
+    // Creates a step for docs.
+    const main_docs = b.addInstallDirectory(.{
+        .source_dir = exe_tests_main.getEmittedDocs(),
+        .install_dir = .{ .custom = ".." },
+        .install_subdir = "docs",
+    });
+
+    const docs_step = b.step("docs", "Build docs");
+    docs_step.dependOn(&main_docs.step);
 }

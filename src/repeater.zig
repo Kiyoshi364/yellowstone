@@ -13,8 +13,7 @@ pub const Delay = enum(u2) {
 
     fn mask(d: Delay) u4 {
         return @intCast(
-            u4,
-            @shlExact(@as(u5, 2), @enumToInt(d)) - 1,
+            @shlExact(@as(u5, 2), @intFromEnum(d)) - 1,
         );
     }
 
@@ -115,7 +114,7 @@ pub const CanonicalRepeater = struct {
         std.debug.assert(r.is_valid());
         const top_bit = @shlExact(
             @as(u4, curr_in),
-            @enumToInt(r.delay),
+            @intFromEnum(r.delay),
         );
         return .{
             .facing = r.facing,
@@ -126,7 +125,7 @@ pub const CanonicalRepeater = struct {
     }
 
     pub fn next_out(r: CanonicalRepeater) u1 {
-        return @intCast(u1, r.memory & 1);
+        return @intCast(r.memory & 1);
     }
 
     pub fn is_on(r: CanonicalRepeater) bool {
@@ -146,7 +145,7 @@ const SeqIter = struct {
     fn next(self: *SeqIter) ?u4 {
         const max_seq = @shlExact(
             @as(u5, 2),
-            @enumToInt(self.delay),
+            @intFromEnum(self.delay),
         );
         return if (self.done)
             null
@@ -170,22 +169,20 @@ fn test_repeater_with_facing_delay(
     var seq_iter = SeqIter.init(delay);
     var last_out = @as(?u1, null);
 
-    const bits = @enumToInt(delay) +% 1;
+    const bits = @intFromEnum(delay) +% 1;
     while (seq_iter.next()) |sequence| : (last_seq = sequence) {
         var bit_i = @as(u3, 0);
-        while (bit_i <= @enumToInt(delay)) : (bit_i += 1) {
-            const i = @intCast(u2, bit_i);
+        while (bit_i <= @intFromEnum(delay)) : (bit_i += 1) {
+            const i: u2 = @intCast(bit_i);
             const bit_mask = @shlExact(@as(u4, 1), i);
-            const bit = @intCast(
-                u1,
+            const bit: u1 = @intCast(
                 @shrExact(sequence & bit_mask, i),
             );
 
             const ls = last_seq orelse 0;
             const lo = last_out orelse 0;
 
-            const new_mask = @intCast(
-                u4,
+            const new_mask: u4 = @intCast(
                 @shlExact(@as(u5, 1), i) - 1,
             );
             const old_mask = ~new_mask;
@@ -197,7 +194,7 @@ fn test_repeater_with_facing_delay(
             );
 
             const mem = new_mem | old_mem;
-            const last_bit = @intCast(u1, old_mem & 1);
+            const last_bit: u1 = @intCast(old_mem & 1);
             try std.testing.expectEqual(
                 last_bit,
                 rep.next_out(),
@@ -222,13 +219,12 @@ fn test_repeater_with_facing_delay(
         const ls = last_seq.?;
         const lo = last_out.?;
         var bit_i = @as(u3, 0);
-        while (bit_i <= @enumToInt(delay)) : (bit_i += 1) {
-            const i = @intCast(u2, bit_i);
+        while (bit_i <= @intFromEnum(delay)) : (bit_i += 1) {
+            const i: u2 = @intCast(bit_i);
             const bit_mask = @shlExact(@as(u4, 1), i);
             const bit = @as(u1, 0);
 
-            const last_bit = @intCast(
-                u1,
+            const last_bit: u1 = @intCast(
                 @shrExact(ls & bit_mask, i),
             );
             try std.testing.expectEqual(
@@ -302,7 +298,7 @@ pub const ImplicitDelayRepeater = struct {
     }
 
     inline fn pack_delay_mem(delay: Delay, mem: u4) u5 {
-        const idelay = @enumToInt(delay);
+        const idelay = @intFromEnum(delay);
         const not_m_mask = @as(u5, 0b11110) << idelay;
         const delay_bits = @as(u5, 0b00010) << idelay;
 
@@ -312,12 +308,12 @@ pub const ImplicitDelayRepeater = struct {
     }
 
     inline fn unpack_delay_mem(in: u5) struct { delay: Delay, mem: u4 } {
-        const clz = @clz(@intCast(u3, in >> 2));
-        const delay = @intToEnum(Delay, 3 - clz);
+        const clz = @clz(@as(u3, @intCast(in >> 2)));
+        const delay = @as(Delay, @enumFromInt(3 - clz));
 
         return .{
             .delay = delay,
-            .mem = @intCast(u4, in & delay.mask()),
+            .mem = @intCast(in & delay.mask()),
         };
     }
 
@@ -352,7 +348,7 @@ pub const ImplicitDelayRepeater = struct {
     }
 
     pub fn next_out(r: ImplicitDelayRepeater) u1 {
-        return @intCast(u1, r.data & 1);
+        return @intCast(r.data & 1);
     }
 
     pub fn is_on(r: ImplicitDelayRepeater) bool {

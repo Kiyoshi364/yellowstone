@@ -78,7 +78,7 @@ pub const DirectionEnum = enum(u3) {
     }
 
     pub fn axis(self: DirectionEnum) u2 {
-        return @enumToInt(self.toAxis());
+        return @intFromEnum(self.toAxis());
     }
 
     pub fn is_positive(self: DirectionEnum) bool {

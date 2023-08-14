@@ -334,8 +334,8 @@ pub fn update(
                         unreachable;
                     },
                 };
-                break :blk @intCast(u4, switch (that_power) {
-                    .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => @enumToInt(that_power),
+                break :blk @intCast(switch (that_power) {
+                    .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => @intFromEnum(that_power),
                     .source, .repeater, .negator => 15,
                     .comparator => unreachable,
                     _ => unreachable,
@@ -362,8 +362,8 @@ pub fn update(
                                 unreachable;
                             },
                         };
-                        const side = @intCast(u4, switch (that_power) {
-                            .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => @enumToInt(that_power),
+                        const side: u4 = @intCast(switch (that_power) {
+                            .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => @intFromEnum(that_power),
                             .source, .repeater, .negator => 15,
                             .comparator => unreachable,
                             _ => unreachable,
@@ -429,7 +429,7 @@ fn update_wire(
     std.debug.assert(b == .wire);
     var this_power = Power.empty;
     for (directions) |de| {
-        std.debug.assert(0 <= @enumToInt(this_power));
+        std.debug.assert(0 <= @intFromEnum(this_power));
         if (de.inbounds(usize, z, y, x, bounds)) |npos| {
             const nz = npos[0];
             const ny = npos[1];
@@ -468,11 +468,8 @@ fn update_wire(
                 .thirteen,
                 .fourteen,
                 .fifteen,
-                => if (@enumToInt(this_power) < @enumToInt(that_power))
-                    @intToEnum(
-                        Power,
-                        @enumToInt(that_power) - 1,
-                    )
+                => if (@intFromEnum(this_power) < @intFromEnum(that_power))
+                    @enumFromInt(@intFromEnum(that_power) - 1)
                 else
                     this_power,
                 .comparator => unreachable,
@@ -523,7 +520,7 @@ fn update_block_or_led(
                 },
             };
             this_power = switch (that_power) {
-                .source => if (0 <= @enumToInt(this_power))
+                .source => if (0 <= @intFromEnum(this_power))
                     power.BLOCK_ON_POWER
                 else
                     this_power,
@@ -545,7 +542,7 @@ fn update_block_or_led(
                         this_power;
                 },
                 .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen => blk: {
-                    std.debug.assert(0 < @enumToInt(that_power));
+                    std.debug.assert(0 < @intFromEnum(that_power));
                     break :blk if (this_power == power.BLOCK_OFF_POWER)
                         power.BLOCK_ON_POWER
                     else
@@ -608,8 +605,7 @@ fn look_at_power(
                 b.facing().?.back(),
             );
             break :blk if (next_out > 0 and is_facing_me)
-                @intToEnum(
-                    Power,
+                @enumFromInt(
                     @as(i5, next_out) +% 1,
                 )
             else
@@ -668,22 +664,22 @@ fn default_render_block(b: Block, this_power: Power) DrawBlock {
     };
     const c_info = switch (b) {
         .empty, .source, .wire, .block, .led, .comparator, .negator => @as(u8, ' '),
-        .repeater => |r| "1234"[@enumToInt(r.get_delay())],
+        .repeater => |r| "1234"[@intFromEnum(r.get_delay())],
     };
     const char_dirs = @as(*const [6]u8, "o^>v<x");
     var c_dirs = @as([5]u8, "     ".*);
     if (b.facing()) |facing| {
-        const i = @enumToInt(facing);
+        const i = @intFromEnum(facing);
         c_dirs[i % c_dirs.len] = char_dirs[i];
     } else {
         // Empty
     }
-    const above = @enumToInt(DirectionEnum.Above);
-    const up = @enumToInt(DirectionEnum.Up);
-    const right = @enumToInt(DirectionEnum.Right);
-    const down = @enumToInt(DirectionEnum.Down);
-    const left = @enumToInt(DirectionEnum.Left);
-    const below = @enumToInt(DirectionEnum.Below) % c_dirs.len;
+    const above = @intFromEnum(DirectionEnum.Above);
+    const up = @intFromEnum(DirectionEnum.Up);
+    const right = @intFromEnum(DirectionEnum.Right);
+    const down = @intFromEnum(DirectionEnum.Down);
+    const left = @intFromEnum(DirectionEnum.Left);
+    const below = @intFromEnum(DirectionEnum.Below) % c_dirs.len;
     std.debug.assert(above == below);
     return DrawBlock{
         .up_row = [3]u8{ c_dirs[above], c_dirs[up], c_info },
