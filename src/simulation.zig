@@ -77,9 +77,11 @@ test "State compiles!" {
     std.testing.refAllDeclsRecursive(State.BlockIter);
 }
 
+pub const MachineOut = enum { old_out, new_out };
+pub const PutBlock = struct { z: u8, y: u8, x: u8, block: Block };
 pub const Input = union(enum) {
     step,
-    putBlock: struct { z: u8, y: u8, x: u8, block: Block },
+    putBlock: PutBlock,
 };
 
 pub const Render = *const [depth][height][width]DrawBlock;
@@ -94,21 +96,22 @@ pub fn update(
     input: Input,
     alloc: Allocator,
 ) Allocator.Error!State {
-    var newstate = state;
-
-    const should_step = switch (input) {
-        .step => true,
-        .putBlock => false,
+    return switch (input) {
+        .step => update_step(state, alloc),
+        .putBlock => |put| update_putBlock(state, put, alloc),
     };
+}
+
+pub fn update_step(
+    state: State,
+    alloc: Allocator,
+) Allocator.Error!State {
+    var newstate = state;
 
     var mod_stack = std.ArrayList(State.Pos).init(alloc);
     defer mod_stack.deinit();
 
-    if (should_step) { // push "delayed machines" interactions
-        // Note: this is before "handle input"
-        // because update_list is a stack
-        // and this should be handled after
-        // (not that it matters)
+    { // push "delayed machines" interactions
         var block_it = State.BlockIter{};
         while (block_it.next_pos()) |pos| {
             const z = pos[0];
@@ -125,6 +128,7 @@ pub fn update(
                 .repeater,
                 .comparator,
                 => {
+                    // TODO: The following can be done!
                     // Note: here should be a great place
                     // to "do nothing" if the machine's
                     // output was the same.
@@ -141,6 +145,7 @@ pub fn update(
                     }
                 },
                 .negator => {
+                    // TODO: The following can be done!
                     // Note: here should be a great place
                     // to "do nothing" if negator's
                     // output was the same.
@@ -163,115 +168,14 @@ pub fn update(
         }
     }
 
-    { // handle input
-        switch (input) {
-            .step => {},
-            .putBlock => |i| {
-                newstate.block_grid[i.z][i.y][i.x] = i.block;
-                newstate.power_grid[i.z][i.y][i.x] = switch (i.block) {
-                    .empty => power.EMPTY_POWER,
-                    .source => power.SOURCE_POWER,
-                    .wire,
-                    .block,
-                    .led,
-                    => power.BLOCK_OFF_POWER,
-                    .repeater => |r| blk: {
-                        std.debug.assert(r.is_valid());
-                        break :blk power.REPEATER_POWER;
-                    },
-                    .comparator => power.COMPARATOR_POWER,
-                    .negator => power.NEGATOR_POWER,
-                };
-                for (directions) |de| {
-                    if (de.inbounds(usize, i.z, i.y, i.x, bounds)) |npos| {
-                        try mod_stack.append(npos);
-                    }
-                }
-                const should_update = switch (i.block) {
-                    .empty,
-                    .source,
-                    .repeater,
-                    .comparator,
-                    .negator,
-                    => false,
-                    .wire,
-                    .block,
-                    .led,
-                    => true,
-                };
-                if (should_update) {
-                    try mod_stack.append(State.Pos{ i.z, i.y, i.x });
-                }
-            },
-        }
-    }
+    try inner_update(
+        @TypeOf(mod_stack),
+        &newstate,
+        &mod_stack,
+        .new_out,
+    );
 
-    { // update marked power
-        // Note: a block may be marked many times
-        // leading to unnecessary updates
-        while (mod_stack.popOrNull()) |pos| {
-            const z = pos[0];
-            const y = pos[1];
-            const x = pos[2];
-            const b = newstate.block_grid[z][y][x];
-            switch (b) {
-                .empty => {
-                    const empty_is_ok = std.meta.eql(
-                        power.EMPTY_POWER,
-                        newstate.power_grid[z][y][x],
-                    );
-                    std.debug.assert(empty_is_ok);
-                },
-                .source => {
-                    const source_is_ok = std.meta.eql(
-                        power.SOURCE_POWER,
-                        newstate.power_grid[z][y][x],
-                    );
-                    std.debug.assert(source_is_ok);
-                },
-                .wire => try update_wire(
-                    &newstate,
-                    &mod_stack,
-                    z,
-                    y,
-                    x,
-                    b,
-                ),
-                .block, .led => try update_block_or_led(
-                    &newstate,
-                    &mod_stack,
-                    z,
-                    y,
-                    x,
-                    b,
-                ),
-                .repeater => |r| {
-                    const repeater_is_ok = std.meta.eql(
-                        power.REPEATER_POWER,
-                        newstate.power_grid[z][y][x],
-                    );
-                    std.debug.assert(repeater_is_ok);
-                    std.debug.assert(r.is_valid());
-                },
-                .comparator => {
-                    const comparator_is_ok = std.meta.eql(
-                        power.COMPARATOR_POWER,
-                        newstate.power_grid[z][y][x],
-                    );
-                    std.debug.assert(comparator_is_ok);
-                },
-                .negator => {
-                    const negator_is_ok = std.meta.eql(
-                        power.NEGATOR_POWER,
-                        newstate.power_grid[z][y][x],
-                    );
-                    std.debug.assert(negator_is_ok);
-                },
-            }
-        }
-    }
-
-    if (should_step) { // For each repeater, shift input
+    { // For each repeater, shift input
         var block_it = State.BlockIter{};
         while (block_it.next_pos()) |pos| {
             const z = pos[0];
@@ -285,6 +189,7 @@ pub fn update(
                 if (back_dir.inbounds_arr(usize, pos, bounds)) |bpos|
             blk: {
                 const that_power = look_at_power(
+                    .new_out,
                     back_dir,
                     newstate.block_grid[bpos[0]][bpos[1]][bpos[2]],
                     newstate.power_grid[bpos[0]][bpos[1]][bpos[2]],
@@ -308,7 +213,7 @@ pub fn update(
         }
     }
 
-    if (should_step) { // For each comparator, shift input
+    { // For each comparator, shift input
         var block_it = State.BlockIter{};
         while (block_it.next_pos()) |pos| {
             const z = pos[0];
@@ -322,6 +227,7 @@ pub fn update(
                 if (back_dir.inbounds_arr(usize, pos, bounds)) |bpos|
             blk: {
                 const that_power = look_at_power(
+                    .new_out,
                     back_dir,
                     newstate.block_grid[bpos[0]][bpos[1]][bpos[2]],
                     newstate.power_grid[bpos[0]][bpos[1]][bpos[2]],
@@ -350,6 +256,7 @@ pub fn update(
                     }
                     if (de.inbounds_arr(usize, pos, bounds)) |bpos| {
                         const that_power = look_at_power(
+                            .new_out,
                             de,
                             newstate.block_grid[bpos[0]][bpos[1]][bpos[2]],
                             newstate.power_grid[bpos[0]][bpos[1]][bpos[2]],
@@ -379,7 +286,7 @@ pub fn update(
         }
     }
 
-    if (should_step) { // For each negator, shift input
+    { // For each negator, shift input
         var block_it = State.BlockIter{};
         while (block_it.next_pos()) |pos| {
             const z = pos[0];
@@ -393,6 +300,7 @@ pub fn update(
                 if (back_dir.inbounds_arr(usize, pos, bounds)) |bpos|
             blk: {
                 const that_power = look_at_power(
+                    .new_out,
                     back_dir,
                     newstate.block_grid[bpos[0]][bpos[1]][bpos[2]],
                     newstate.power_grid[bpos[0]][bpos[1]][bpos[2]],
@@ -418,9 +326,144 @@ pub fn update(
     return newstate;
 }
 
-fn update_wire(
+pub fn update_putBlock(
+    state: State,
+    put: PutBlock,
+    alloc: Allocator,
+) Allocator.Error!State {
+    var newstate = state;
+
+    var mod_stack = std.ArrayList(State.Pos).init(alloc);
+    defer mod_stack.deinit();
+
+    { // handle putBlock
+        const i = put;
+        newstate.block_grid[i.z][i.y][i.x] = i.block;
+        newstate.power_grid[i.z][i.y][i.x] = switch (i.block) {
+            .empty => power.EMPTY_POWER,
+            .source => power.SOURCE_POWER,
+            .wire,
+            .block,
+            .led,
+            => power.BLOCK_OFF_POWER,
+            .repeater => |r| blk: {
+                std.debug.assert(r.is_valid());
+                break :blk power.REPEATER_POWER;
+            },
+            .comparator => power.COMPARATOR_POWER,
+            .negator => power.NEGATOR_POWER,
+        };
+        for (directions) |de| {
+            if (de.inbounds(usize, i.z, i.y, i.x, bounds)) |npos| {
+                try mod_stack.append(npos);
+            }
+        }
+        const should_update = switch (i.block) {
+            .empty,
+            .source,
+            .repeater,
+            .comparator,
+            .negator,
+            => false,
+            .wire,
+            .block,
+            .led,
+            => true,
+        };
+        if (should_update) {
+            try mod_stack.append(State.Pos{ i.z, i.y, i.x });
+        }
+    }
+
+    try inner_update(
+        @TypeOf(mod_stack),
+        &newstate,
+        &mod_stack,
+        .old_out,
+    );
+    return newstate;
+}
+
+/// update marked power
+/// Note: a block may be marked many times
+/// leading to unnecessary updates
+fn inner_update(
+    comptime Stack: type,
     newstate: *State,
-    mod_stack: *std.ArrayList(State.Pos),
+    mod_stack: *Stack,
+    choose_output: MachineOut,
+) Allocator.Error!void {
+    while (mod_stack.popOrNull()) |pos| {
+        const z = pos[0];
+        const y = pos[1];
+        const x = pos[2];
+        const b = newstate.block_grid[z][y][x];
+        switch (b) {
+            .empty => {
+                const empty_is_ok = std.meta.eql(
+                    power.EMPTY_POWER,
+                    newstate.power_grid[z][y][x],
+                );
+                std.debug.assert(empty_is_ok);
+            },
+            .source => {
+                const source_is_ok = std.meta.eql(
+                    power.SOURCE_POWER,
+                    newstate.power_grid[z][y][x],
+                );
+                std.debug.assert(source_is_ok);
+            },
+            .wire => try update_wire(
+                Stack,
+                newstate,
+                mod_stack,
+                choose_output,
+                z,
+                y,
+                x,
+                b,
+            ),
+            .block, .led => try update_block_or_led(
+                Stack,
+                newstate,
+                mod_stack,
+                choose_output,
+                z,
+                y,
+                x,
+                b,
+            ),
+            .repeater => |r| {
+                const repeater_is_ok = std.meta.eql(
+                    power.REPEATER_POWER,
+                    newstate.power_grid[z][y][x],
+                );
+                std.debug.assert(repeater_is_ok);
+                std.debug.assert(r.is_valid());
+            },
+            .comparator => {
+                const comparator_is_ok = std.meta.eql(
+                    power.COMPARATOR_POWER,
+                    newstate.power_grid[z][y][x],
+                );
+                std.debug.assert(comparator_is_ok);
+            },
+            .negator => {
+                const negator_is_ok = std.meta.eql(
+                    power.NEGATOR_POWER,
+                    newstate.power_grid[z][y][x],
+                );
+                std.debug.assert(negator_is_ok);
+            },
+        }
+    }
+}
+
+fn update_wire(
+    comptime Stack: type,
+    newstate: *State,
+    mod_stack: *Stack,
+    choose_output: MachineOut,
     z: usize,
     y: usize,
     x: usize,
@@ -436,6 +479,7 @@ fn update_wire(
             const nx = npos[2];
             const that_block = newstate.block_grid[nz][ny][nx];
             const that_power = look_at_power(
+                choose_output,
                 de,
                 that_block,
                 newstate.power_grid[nz][ny][nx],
@@ -488,8 +532,10 @@ fn update_wire(
 }
 
 fn update_block_or_led(
+    comptime Stack: type,
     newstate: *State,
-    mod_stack: *std.ArrayList(State.Pos),
+    mod_stack: *Stack,
+    choose_output: MachineOut,
     z: usize,
     y: usize,
     x: usize,
@@ -507,6 +553,7 @@ fn update_block_or_led(
             const nx = npos[2];
             const that_block = newstate.block_grid[nz][ny][nx];
             const that_power = look_at_power(
+                choose_output,
                 de,
                 that_block,
                 newstate.power_grid[nz][ny][nx],
@@ -563,16 +610,8 @@ fn update_block_or_led(
     }
 }
 
-// TODO: Fix following bug
-// BUG: "delayed machines" don't save their current output,
-//    so if a block gets updated by the input (without stepping)
-//    it can't read the current output and
-//    may be updated to a weird state
-//    (for example putting an empty block near a wire
-//    will cause the wire to try to update).
-//    Stepping the simulation should fix this automatically.
-//    Possible solution is to save their current output.
 fn look_at_power(
+    choose_output: MachineOut,
     from_de: DirectionEnum,
     b: Block,
     p: Power,
@@ -587,7 +626,10 @@ fn look_at_power(
         },
         .repeater => blk: {
             std.debug.assert(b == .repeater);
-            const is_on = b.repeater.is_on();
+            const is_on = switch (choose_output) {
+                .old_out => b.repeater.last_out == 1,
+                .new_out => b.repeater.is_on(),
+            };
             const is_facing_me = std.meta.eql(
                 from_de,
                 b.facing().?.back(),
@@ -599,7 +641,10 @@ fn look_at_power(
         },
         .comparator => blk: {
             std.debug.assert(b == .comparator);
-            const next_out = b.comparator.next_out();
+            const next_out = switch (choose_output) {
+                .old_out => b.comparator.last_out,
+                .new_out => b.comparator.next_out(),
+            };
             const is_facing_me = std.meta.eql(
                 from_de,
                 b.facing().?.back(),
@@ -613,7 +658,10 @@ fn look_at_power(
         },
         .negator => blk: {
             std.debug.assert(b == .negator);
-            const is_on = b.negator.is_on();
+            const is_on = switch (choose_output) {
+                .old_out => b.negator.last_out == 1,
+                .new_out => b.negator.is_on(),
+            };
             const is_backing_me = std.meta.eql(
                 from_de,
                 b.facing().?,
