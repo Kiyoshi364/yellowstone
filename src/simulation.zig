@@ -125,43 +125,52 @@ pub fn update_step(
                 .block,
                 .led,
                 => {},
-                .repeater,
-                .comparator,
-                => {
-                    // TODO: The following can be done!
-                    // Note: here should be a great place
-                    // to "do nothing" if the machine's
-                    // output was the same.
-                    // But we don't have this information
-                    // (only what we will output now)
-                    if (b.facing().?.inbounds_arr(
-                        usize,
-                        pos,
-                        bounds,
-                    )) |front_pos| {
-                        try mod_stack.append(front_pos);
+                .repeater => |r| {
+                    if (r.next_out() != r.last_out) {
+                        if (r.facing.inbounds_arr(
+                            usize,
+                            pos,
+                            bounds,
+                        )) |front_pos| {
+                            try mod_stack.append(front_pos);
+                        } else {
+                            // Empty
+                        }
                     } else {
                         // Empty
                     }
                 },
-                .negator => {
-                    // TODO: The following can be done!
-                    // Note: here should be a great place
-                    // to "do nothing" if negator's
-                    // output was the same.
-                    // But we don't have this information
-                    // (only what we will output now)
-                    var buffer = @as([DirectionEnum.count]DirectionEnum, undefined);
-                    for (b.facing().?.back().others(&buffer)) |d| {
-                        if (d.inbounds_arr(
+                .comparator => |c| {
+                    if (c.next_out() != c.last_out) {
+                        if (c.facing.inbounds_arr(
                             usize,
                             pos,
                             bounds,
-                        )) |npos| {
-                            try mod_stack.append(npos);
+                        )) |front_pos| {
+                            try mod_stack.append(front_pos);
                         } else {
                             // Empty
                         }
+                    } else {
+                        // Empty
+                    }
+                },
+                .negator => |n| {
+                    if (n.next_out() != n.last_out) {
+                        var buffer = @as([DirectionEnum.count]DirectionEnum, undefined);
+                        for (n.facing.back().others(&buffer)) |d| {
+                            if (d.inbounds_arr(
+                                usize,
+                                pos,
+                                bounds,
+                            )) |npos| {
+                                try mod_stack.append(npos);
+                            } else {
+                                // Empty
+                            }
+                        }
+                    } else {
+                        // Empty
                     }
                 },
             }

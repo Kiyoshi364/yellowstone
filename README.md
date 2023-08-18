@@ -407,4 +407,3 @@ Have a config file to (re)map buttons
 ### Event List hold unique positions
 ### Events to Empty block are not stored
 ### Cache machines' positions
-### Unchanged machines don't trigger update events
