@@ -16,6 +16,8 @@ const Block = block.Block;
 const BlockType = block.BlockType;
 const Repeater = block.Repeater;
 
+const power = @import("power.zig");
+
 const Uisize = @Type(.{ .Int = .{
     .bits = @typeInfo(isize).Int.bits - 1,
     .signedness = .unsigned,
@@ -341,6 +343,66 @@ fn print_input_ln(writer: anytype, input_count: usize, m_input: ?sim.Input) !voi
     try writer.print("\n", .{});
 }
 
+fn default_render_drawinfo(info: sim.DrawInfo) DrawBlock {
+    const char_powers = @as(*const [17]u8, " 123456789abcdef*");
+    const c_power = char_powers[info.power];
+    const c_block = switch (info.block_type) {
+        .empty => @as(u8, ' '),
+        .source => @as(u8, 'S'),
+        .wire => @as(u8, 'w'),
+        .block => @as(u8, 'B'),
+        .led => @as(u8, 'L'),
+        .repeater => @as(u8, 'r'),
+        .comparator => @as(u8, 'c'),
+        .negator => @as(u8, 'n'),
+    };
+    const c_mem = char_powers[info.memory orelse 0];
+    const c_info = if (info.info) |i| "1234"[i] else ' ';
+    const char_dirs = @as(*const [6]u8, "o^>v<x");
+    var c_dirs = @as([5]u8, "     ".*);
+    if (info.dir) |facing| {
+        const i = @intFromEnum(facing);
+        c_dirs[i % c_dirs.len] = char_dirs[i];
+    } else {
+        // Empty
+    }
+    const above = @intFromEnum(DirectionEnum.Above);
+    const up = @intFromEnum(DirectionEnum.Up);
+    const right = @intFromEnum(DirectionEnum.Right);
+    const down = @intFromEnum(DirectionEnum.Down);
+    const left = @intFromEnum(DirectionEnum.Left);
+    const below = @intFromEnum(DirectionEnum.Below) % c_dirs.len;
+    std.debug.assert(above == below);
+    return DrawBlock{
+        .top_row = [3]u8{ c_dirs[above], c_dirs[up], c_info },
+        .mid_row = [3]u8{ c_dirs[left], c_block, c_dirs[right] },
+        .bot_row = [3]u8{ c_power, c_dirs[down], c_mem },
+    };
+}
+
+fn render_drawinfo(info: sim.DrawInfo) DrawBlock {
+    return if (info.block_type == .led) blk: {
+        const mid_row = switch (info.power) {
+            power.SOURCE_POWER.to_index() => "***".*,
+            power.BLOCK_ON_POWER.to_index() => "*L*".*,
+            power.BLOCK_OFF_POWER.to_index() => " L ".*,
+            else => unreachable,
+        };
+        break :blk if (info.power > 0)
+            DrawBlock{
+                .top_row = "***".*,
+                .mid_row = mid_row,
+                .bot_row = "***".*,
+            }
+        else
+            DrawBlock{
+                .top_row = "   ".*,
+                .mid_row = " L ".*,
+                .bot_row = "   ".*,
+            };
+    } else default_render_drawinfo(info);
+}
+
 pub fn draw(
     ctl: CtlState,
     alloc: std.mem.Allocator,
@@ -351,7 +413,7 @@ pub fn draw(
     const camera = ctl.camera;
     const line_width = camera.dim[2] + 1;
 
-    const line_buffer = try alloc.alloc(sim.DrawBlock, line_width);
+    const line_buffer = try alloc.alloc(DrawBlock, line_width);
     defer alloc.free(line_buffer);
 
     var screen_above_iter = blk: {
@@ -410,9 +472,9 @@ pub fn draw(
                             state.block_grid[ipos[0]][ipos[1]][ipos[2]],
                         );
                         const this_power = state.power_grid[ipos[0]][ipos[1]][ipos[2]];
-                        break :blk sim.render_block(b, this_power);
+                        break :blk render_drawinfo(sim.get_drawinfo(b, this_power));
                     } else .{
-                        .up_row = "&&&".*,
+                        .top_row = "&&&".*,
                         .mid_row = "&&&".*,
                         .bot_row = "&&&".*,
                     };
@@ -440,14 +502,14 @@ pub fn draw(
                     std.debug.assert(ipos[zi] == ctl.cursor[zi]);
                     std.debug.assert(ipos[yi] == ctl.cursor[yi]);
                     if (ipos[xi] == ctl.cursor[xi]) {
-                        try writer.print("{s: ^2}x|", .{x.up_row[0..2]});
+                        try writer.print("{s: ^2}x|", .{x.top_row[0..2]});
                     } else {
-                        try writer.print("{s: ^3}|", .{x.up_row});
+                        try writer.print("{s: ^3}|", .{x.top_row});
                     }
                 } else try writer.print("\n", .{});
             } else {
                 for (line_buffer) |x| {
-                    try writer.print("{s: ^3}|", .{x.up_row});
+                    try writer.print("{s: ^3}|", .{x.top_row});
                 } else try writer.print("\n", .{});
             }
 
@@ -506,6 +568,12 @@ pub fn draw(
 
     try print_repeat_ln(writer, "=", .{}, line_width * 4 + 1);
 }
+
+pub const DrawBlock = struct {
+    top_row: [3]u8,
+    mid_row: [3]u8,
+    bot_row: [3]u8,
+};
 
 test "controler compiles!" {
     std.testing.refAllDeclsRecursive(@This());

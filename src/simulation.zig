@@ -84,7 +84,7 @@ pub const Input = union(enum) {
     putBlock: PutBlock,
 };
 
-pub const Render = *const [depth][height][width]DrawBlock;
+pub const Render = *const [depth][height][width]DrawInfo;
 
 pub const emptyState = @as(State, .{
     .block_grid = .{.{.{.{ .empty = .{} }} ** width} ** height} ** depth,
@@ -684,106 +684,66 @@ fn look_at_power(
     };
 }
 
-fn default_render_block(b: Block, this_power: Power) DrawBlock {
-    const char_powers = @as(*const [17]u8, " 123456789abcdef*");
-    const power_index = this_power.to_index();
-    const c_power = if (power_index < char_powers.len)
-        char_powers[power_index]
-    else blk: {
-        if (power_index == power.REPEATER_POWER.to_index()) {
+pub fn get_drawinfo(b: Block, this_power: Power) DrawInfo {
+    const pwr = switch (this_power) {
+        .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen, .source => @as(
+            power.PowerUint,
+            @intCast(this_power.to_index()),
+        ),
+        .repeater => blk: {
             std.debug.assert(b == .repeater);
-            break :blk char_powers[b.repeater.last_out];
-        } else if (power_index == power.COMPARATOR_POWER.to_index()) {
+            break :blk b.repeater.last_out;
+        },
+        .comparator => blk: {
             std.debug.assert(b == .comparator);
-            break :blk char_powers[b.comparator.last_out];
-        } else if (power_index == power.NEGATOR_POWER.to_index()) {
+            break :blk b.comparator.last_out;
+        },
+        .negator => blk: {
             std.debug.assert(b == .negator);
-            break :blk char_powers[b.negator.last_out];
-        } else {
-            unreachable;
-        }
+            break :blk b.negator.last_out;
+        },
+        _ => unreachable,
     };
-    const c_block = switch (b) {
-        .empty => @as(u8, ' '),
-        .source => @as(u8, 'S'),
-        .wire => @as(u8, 'w'),
-        .block => @as(u8, 'B'),
-        .led => @as(u8, 'L'),
-        .repeater => @as(u8, 'r'),
-        .comparator => @as(u8, 'c'),
-        .negator => @as(u8, 'n'),
+    const memory = switch (b) {
+        .empty, .source, .wire, .block, .led => null,
+        .repeater => |r| r.get_memory(),
+        .comparator => |c| c.memory,
+        .negator => |n| n.memory,
     };
-    const c_mem = switch (b) {
-        .empty, .source, .wire, .block, .led => @as(u8, ' '),
-        .repeater => |r| char_powers[r.get_memory()],
-        .comparator => |c| char_powers[c.memory],
-        .negator => |n| char_powers[n.memory],
+    const info = switch (b) {
+        .empty, .source, .wire, .block, .led, .comparator, .negator => null,
+        .repeater => |r| @intFromEnum(r.get_delay()),
     };
-    const c_info = switch (b) {
-        .empty, .source, .wire, .block, .led, .comparator, .negator => @as(u8, ' '),
-        .repeater => |r| "1234"[@intFromEnum(r.get_delay())],
+    return DrawInfo{
+        .power = pwr,
+        .block_type = @as(block.BlockType, b),
+        .memory = memory,
+        .info = info,
+        .dir = b.facing(),
     };
-    const char_dirs = @as(*const [6]u8, "o^>v<x");
-    var c_dirs = @as([5]u8, "     ".*);
-    if (b.facing()) |facing| {
-        const i = @intFromEnum(facing);
-        c_dirs[i % c_dirs.len] = char_dirs[i];
-    } else {
-        // Empty
-    }
-    const above = @intFromEnum(DirectionEnum.Above);
-    const up = @intFromEnum(DirectionEnum.Up);
-    const right = @intFromEnum(DirectionEnum.Right);
-    const down = @intFromEnum(DirectionEnum.Down);
-    const left = @intFromEnum(DirectionEnum.Left);
-    const below = @intFromEnum(DirectionEnum.Below) % c_dirs.len;
-    std.debug.assert(above == below);
-    return DrawBlock{
-        .up_row = [3]u8{ c_dirs[above], c_dirs[up], c_info },
-        .mid_row = [3]u8{ c_dirs[left], c_block, c_dirs[right] },
-        .bot_row = [3]u8{ c_power, c_dirs[down], c_mem },
-    };
-}
-
-pub fn render_block(b: Block, this_power: Power) DrawBlock {
-    return if (b == .led)
-        if (this_power == power.SOURCE_POWER)
-            DrawBlock{
-                .up_row = "***".*,
-                .mid_row = "***".*,
-                .bot_row = "***".*,
-            }
-        else if (this_power == power.BLOCK_ON_POWER)
-            DrawBlock{
-                .up_row = "***".*,
-                .mid_row = "*L*".*,
-                .bot_row = "***".*,
-            }
-        else
-            default_render_block(b, this_power)
-    else
-        default_render_block(b, this_power);
 }
 
 pub fn render_grid(
     state: State,
     alloc: Allocator,
 ) Allocator.Error!Render {
-    const canvas: *[depth][height][width]DrawBlock =
-        try alloc.create([depth][height][width]DrawBlock);
+    const canvas: *[depth][height][width]DrawInfo =
+        try alloc.create([depth][height][width]DrawInfo);
     for (state.block_grid, 0..) |plane, z| {
         for (plane, 0..) |row, y| {
             for (row, 0..) |b, x| {
                 const this_power = state.power_grid[z][y][x];
-                canvas.*[z][y][x] = render_block(b, this_power);
+                canvas.*[z][y][x] = get_drawinfo(b, this_power);
             }
         }
     }
     return canvas;
 }
 
-pub const DrawBlock = struct {
-    up_row: [3]u8,
-    mid_row: [3]u8,
-    bot_row: [3]u8,
+pub const DrawInfo = struct {
+    power: power.PowerUint,
+    block_type: block.BlockType,
+    memory: ?u4,
+    info: ?u2,
+    dir: ?DirectionEnum,
 };
