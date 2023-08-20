@@ -62,8 +62,15 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(test_lib_sim_step);
 
     // Creates a step for docs.
+    const dummy_tests_main = b.addTest(.{
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+    dummy_tests_main.addModule("lib_sim", sim_module);
+
     const main_docs = b.addInstallDirectory(.{
-        .source_dir = exe_tests_main.getEmittedDocs(),
+        .source_dir = dummy_tests_main.getEmittedDocs(),
         .install_dir = .{ .custom = ".." },
         .install_subdir = "docs",
     });
