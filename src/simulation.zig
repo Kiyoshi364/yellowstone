@@ -91,7 +91,7 @@ pub const emptyState = @as(State, .{
     .power_grid = .{.{.{.empty} ** width} ** height} ** depth,
 });
 
-pub fn update(
+fn update(
     state: State,
     input: Input,
     alloc: Allocator,
@@ -102,7 +102,7 @@ pub fn update(
     };
 }
 
-pub fn update_step(
+fn update_step(
     state: State,
     alloc: Allocator,
 ) Allocator.Error!State {
@@ -335,7 +335,7 @@ pub fn update_step(
     return newstate;
 }
 
-pub fn update_putBlock(
+fn update_putBlock(
     state: State,
     put: PutBlock,
     alloc: Allocator,

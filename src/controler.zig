@@ -216,7 +216,7 @@ fn DirPosIter(comptime Int: type) type {
     };
 }
 
-pub fn update(
+fn update(
     ctl: CtlState,
     cinput: CtlInput,
     alloc: Allocator,
@@ -569,7 +569,7 @@ pub fn draw(
     try print_repeat_ln(writer, "=", .{}, line_width * 4 + 1);
 }
 
-pub const DrawBlock = struct {
+const DrawBlock = struct {
     top_row: [3]u8,
     mid_row: [3]u8,
     bot_row: [3]u8,
