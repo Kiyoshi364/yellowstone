@@ -684,42 +684,6 @@ fn look_at_power(
     };
 }
 
-pub fn get_drawinfo(b: Block, this_power: Power) DrawInfo {
-    const pwr = switch (this_power) {
-        .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen, .source => this_power.to_index(),
-        .repeater => blk: {
-            std.debug.assert(b == .repeater);
-            break :blk b.repeater.last_out;
-        },
-        .comparator => blk: {
-            std.debug.assert(b == .comparator);
-            break :blk b.comparator.last_out;
-        },
-        .negator => blk: {
-            std.debug.assert(b == .negator);
-            break :blk b.negator.last_out;
-        },
-        _ => unreachable,
-    };
-    const memory = switch (b) {
-        .empty, .source, .wire, .block, .led => null,
-        .repeater => |r| r.get_memory(),
-        .comparator => |c| c.memory,
-        .negator => |n| n.memory,
-    };
-    const info = switch (b) {
-        .empty, .source, .wire, .block, .led, .comparator, .negator => null,
-        .repeater => |r| @intFromEnum(r.get_delay()),
-    };
-    return DrawInfo{
-        .power = pwr,
-        .block_type = @as(block.BlockType, b),
-        .memory = memory,
-        .info = info,
-        .dir = b.facing(),
-    };
-}
-
 pub fn render_grid(
     state: State,
     alloc: Allocator,
@@ -730,7 +694,7 @@ pub fn render_grid(
         for (plane, 0..) |row, y| {
             for (row, 0..) |b, x| {
                 const this_power = state.power_grid[z][y][x];
-                canvas.*[z][y][x] = get_drawinfo(b, this_power);
+                canvas.*[z][y][x] = DrawInfo.init(b, this_power);
             }
         }
     }
@@ -743,4 +707,40 @@ pub const DrawInfo = struct {
     memory: ?u4,
     info: ?u2,
     dir: ?DirectionEnum,
+
+    pub fn init(b: Block, this_power: Power) DrawInfo {
+        const pwr = switch (this_power) {
+            .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen, .source => this_power.to_index(),
+            .repeater => blk: {
+                std.debug.assert(b == .repeater);
+                break :blk b.repeater.last_out;
+            },
+            .comparator => blk: {
+                std.debug.assert(b == .comparator);
+                break :blk b.comparator.last_out;
+            },
+            .negator => blk: {
+                std.debug.assert(b == .negator);
+                break :blk b.negator.last_out;
+            },
+            _ => unreachable,
+        };
+        const memory = switch (b) {
+            .empty, .source, .wire, .block, .led => null,
+            .repeater => |r| r.get_memory(),
+            .comparator => |c| c.memory,
+            .negator => |n| n.memory,
+        };
+        const info = switch (b) {
+            .empty, .source, .wire, .block, .led, .comparator, .negator => null,
+            .repeater => |r| @intFromEnum(r.get_delay()),
+        };
+        return DrawInfo{
+            .power = pwr,
+            .block_type = @as(block.BlockType, b),
+            .memory = memory,
+            .info = info,
+            .dir = b.facing(),
+        };
+    }
 };

@@ -472,7 +472,7 @@ pub fn draw(
                             state.block_grid[ipos[0]][ipos[1]][ipos[2]],
                         );
                         const this_power = state.power_grid[ipos[0]][ipos[1]][ipos[2]];
-                        break :blk render_drawinfo(sim.get_drawinfo(b, this_power));
+                        break :blk render_drawinfo(sim.DrawInfo.init(b, this_power));
                     } else .{
                         .top_row = "&&&".*,
                         .mid_row = "&&&".*,
