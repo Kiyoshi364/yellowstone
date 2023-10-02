@@ -9,6 +9,56 @@ pub const ctl = @import("controler.zig");
 
 var global_term: ?Term = null;
 
+fn initial_sim_state() sim.State {
+    var state = sim.emptyState;
+
+    state.block_grid[0][5][0] = .{ .wire = .{} };
+    state.block_grid[0][6][0] = .{
+        .repeater = block.Repeater.init(.Up, .two),
+    };
+    state.power_grid[0][6][0] = .repeater;
+    state.block_grid[0][7][0] = .{ .wire = .{} };
+
+    state.block_grid[1][0] = .{.{ .wire = .{} }} ** sim.width;
+    state.block_grid[1][2] = .{.{ .wire = .{} }} ** 8 ++
+        .{.empty} ** (sim.width - 8);
+    state.block_grid[1][1][7] = .{ .wire = .{} };
+    state.block_grid[1][1][9] = .{
+        .comparator = .{ .facing = .Down },
+    };
+    state.power_grid[1][1][9] = .comparator;
+    state.block_grid[1][2][9] = .{ .wire = .{} };
+    state.block_grid[1][3][2] = .{ .wire = .{} };
+    state.block_grid[1][3][3] = .{ .wire = .{} };
+    state.block_grid[1][3][4] = .{ .wire = .{} };
+    state.block_grid[1][3][7] = .{ .wire = .{} };
+    state.block_grid[1][3][9] = .{ .wire = .{} };
+    state.block_grid[1][3][10] = .{
+        .repeater = block.Repeater.init(.Right, .two),
+    };
+    state.power_grid[1][3][10] = .repeater;
+    state.block_grid[1][3][11] = .{ .block = .{} };
+    state.block_grid[1][4][4] = .{ .led = .{} };
+    state.block_grid[1][5][0] = .{
+        .negator = .{ .facing = .Above },
+    };
+    state.power_grid[1][5][0] = .negator;
+    state.block_grid[1][6] = .{.{ .led = .{} }} ** sim.width;
+    state.block_grid[1][6][0] = .{ .block = .{} };
+    state.block_grid[1][6][1] = .{ .wire = .{} };
+    state.block_grid[1][6][2] = .{
+        .comparator = .{ .facing = .Right },
+    };
+    state.power_grid[1][6][2] = .comparator;
+    state.block_grid[1][6][3] = .{ .wire = .{} };
+    state.block_grid[1][7] = .{.{ .wire = .{} }} ** sim.width;
+    state.block_grid[1][7][2] = .{
+        .comparator = .{ .facing = .Left },
+    };
+    state.power_grid[1][7][2] = .comparator;
+    return state;
+}
+
 pub fn main() !void {
     var arena =
         std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -17,54 +67,7 @@ pub fn main() !void {
 
     const controler = ctl.controler;
 
-    const state = blk: {
-        var state = sim.emptyState;
-        state.block_grid[0][5][0] = .{ .wire = .{} };
-        state.block_grid[0][6][0] = .{
-            .repeater = block.Repeater.init(.Up, .two),
-        };
-        state.power_grid[0][6][0] = .repeater;
-        state.block_grid[0][7][0] = .{ .wire = .{} };
-
-        state.block_grid[1][0] = .{.{ .wire = .{} }} ** sim.width;
-        state.block_grid[1][2] = .{.{ .wire = .{} }} ** 8 ++
-            .{.empty} ** (sim.width - 8);
-        state.block_grid[1][1][7] = .{ .wire = .{} };
-        state.block_grid[1][1][9] = .{
-            .comparator = .{ .facing = .Down },
-        };
-        state.power_grid[1][1][9] = .comparator;
-        state.block_grid[1][2][9] = .{ .wire = .{} };
-        state.block_grid[1][3][2] = .{ .wire = .{} };
-        state.block_grid[1][3][3] = .{ .wire = .{} };
-        state.block_grid[1][3][4] = .{ .wire = .{} };
-        state.block_grid[1][3][7] = .{ .wire = .{} };
-        state.block_grid[1][3][9] = .{ .wire = .{} };
-        state.block_grid[1][3][10] = .{
-            .repeater = block.Repeater.init(.Right, .two),
-        };
-        state.power_grid[1][3][10] = .repeater;
-        state.block_grid[1][3][11] = .{ .block = .{} };
-        state.block_grid[1][4][4] = .{ .led = .{} };
-        state.block_grid[1][5][0] = .{
-            .negator = .{ .facing = .Above },
-        };
-        state.power_grid[1][5][0] = .negator;
-        state.block_grid[1][6] = .{.{ .led = .{} }} ** sim.width;
-        state.block_grid[1][6][0] = .{ .block = .{} };
-        state.block_grid[1][6][1] = .{ .wire = .{} };
-        state.block_grid[1][6][2] = .{
-            .comparator = .{ .facing = .Right },
-        };
-        state.power_grid[1][6][2] = .comparator;
-        state.block_grid[1][6][3] = .{ .wire = .{} };
-        state.block_grid[1][7] = .{.{ .wire = .{} }} ** sim.width;
-        state.block_grid[1][7][2] = .{
-            .comparator = .{ .facing = .Left },
-        };
-        state.power_grid[1][7][2] = .comparator;
-        break :blk state;
-    };
+    const state = initial_sim_state();
 
     var ctlstate = ctl.CtlState{
         .sim_state = state,
