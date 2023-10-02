@@ -686,10 +686,7 @@ fn look_at_power(
 
 pub fn get_drawinfo(b: Block, this_power: Power) DrawInfo {
     const pwr = switch (this_power) {
-        .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen, .source => @as(
-            power.PowerUint,
-            @intCast(this_power.to_index()),
-        ),
+        .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen, .source => this_power.to_index(),
         .repeater => blk: {
             std.debug.assert(b == .repeater);
             break :blk b.repeater.last_out;

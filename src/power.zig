@@ -33,8 +33,8 @@ pub const Power = enum(PowerInt) {
     negator = -13,
     _,
 
-    pub fn to_index(self: Power) usize {
-        return @as(PowerUint, @bitCast(@intFromEnum(self)));
+    pub fn to_index(self: Power) PowerUint {
+        return @bitCast(@intFromEnum(self));
     }
 
     test "to_index non-negative values" {
