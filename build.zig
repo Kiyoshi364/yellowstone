@@ -17,6 +17,11 @@ pub fn build(b: *std.Build) void {
         .source_file = .{ .path = "lib_sim/simulation.zig" },
     });
 
+    // Create (de)serialization Module
+    const deser_module = b.createModule(.{
+        .source_file = .{ .path = "deserializer/serializer.zig" },
+    });
+
     const exe = b.addExecutable(.{
         .name = "yellowstone",
         .root_source_file = .{ .path = "src/main.zig" },
@@ -24,6 +29,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe.addModule("lib_sim", sim_module);
+    exe.addModule("lib_deser", deser_module);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -56,6 +62,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     exe_tests_main.addModule("lib_sim", sim_module);
+    exe_tests_main.addModule("lib_deser", deser_module);
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&b.addRunArtifact(exe_tests_main).step);
@@ -68,6 +75,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     dummy_tests_main.addModule("lib_sim", sim_module);
+    dummy_tests_main.addModule("lib_deser", deser_module);
 
     const main_docs = b.addInstallDirectory(.{
         .source_dir = dummy_tests_main.getEmittedDocs(),

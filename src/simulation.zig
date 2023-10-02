@@ -701,12 +701,36 @@ pub fn render_grid(
     return canvas;
 }
 
+pub fn unrender_grid(
+    data_slice: []DrawInfo,
+) State {
+    var block_grid = @as([depth][height][width]Block, undefined);
+    var power_grid = @as([depth][height][width]Power, undefined);
+
+    const block_ptr = @as([*]Block, @ptrCast(&block_grid))[0..(depth * height * width)];
+    const power_ptr = @as([*]Power, @ptrCast(&power_grid))[0..(depth * height * width)];
+    for (data_slice, 0..) |data, i| {
+        const pair = data.to_block_power();
+        block_ptr[i] = pair.b;
+        power_ptr[i] = pair.p;
+    }
+
+    return State{
+        .block_grid = block_grid,
+        .power_grid = power_grid,
+    };
+}
+
 pub const DrawInfo = struct {
-    power: power.PowerUint,
-    block_type: block.BlockType,
+    pub const PowerUint = power.PowerUint;
+    pub const BlockType = block.BlockType;
+    pub const DirectionEnum = Direction.DirectionEnum;
+
+    power: DrawInfo.PowerUint,
+    block_type: DrawInfo.BlockType,
     memory: ?u4,
     info: ?u2,
-    dir: ?DirectionEnum,
+    dir: ?DrawInfo.DirectionEnum,
 
     pub fn init(b: Block, this_power: Power) DrawInfo {
         const pwr = switch (this_power) {
@@ -737,10 +761,55 @@ pub const DrawInfo = struct {
         };
         return DrawInfo{
             .power = pwr,
-            .block_type = @as(block.BlockType, b),
+            .block_type = @as(BlockType, b),
             .memory = memory,
             .info = info,
             .dir = b.facing(),
+        };
+    }
+
+    const Pair = struct { b: Block, p: Power };
+    pub fn to_block_power(data: DrawInfo) Pair {
+        const b = @as(Block, switch (data.block_type) {
+            .empty => .{ .empty = .{} },
+            .source => .{ .source = .{} },
+            .wire => .{ .wire = .{} },
+            .block => .{ .block = .{} },
+            .led => .{ .led = .{} },
+            .repeater => blk: {
+                const rep = block.Repeater.init_all(
+                    data.dir.?,
+                    @enumFromInt(data.info.?),
+                    @intCast(data.memory.?),
+                    @intCast(data.power),
+                );
+                break :blk .{ .repeater = rep };
+            },
+            .comparator => .{ .comparator = .{
+                .facing = data.dir.?,
+                .memory = data.memory.?,
+                .last_out = @intCast(data.power),
+            } },
+            .negator => .{ .negator = .{
+                .facing = data.dir.?,
+                .memory = @intCast(data.memory.?),
+                .last_out = @intCast(data.power),
+            } },
+        });
+        const this_power = @as(Power, switch (data.block_type) {
+            .empty,
+            .source,
+            .wire,
+            .block,
+            .led,
+            => @enumFromInt(data.power),
+            .repeater => power.Power.repeater,
+            .comparator => power.Power.comparator,
+            .negator => power.Power.negator,
+        });
+        return .{
+            .b = b,
+            .p = this_power,
         };
     }
 };

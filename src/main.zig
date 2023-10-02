@@ -2,12 +2,43 @@ const std = @import("std");
 const isWindows = @import("builtin").os.tag == .windows;
 
 const lib_sim = @import("lib_sim");
+const lib_deser = @import("lib_deser");
 
 pub const block = @import("block.zig");
 pub const sim = @import("simulation.zig");
 pub const ctl = @import("controler.zig");
 
 var global_term: ?Term = null;
+
+fn serialize(
+    comptime Writer: type,
+    state: sim.State,
+    writer: Writer,
+    alloc: std.mem.Allocator,
+) !void {
+    const data = try sim.render_grid(state, alloc);
+
+    try lib_deser.serialize(
+        sim.DrawInfo,
+        writer,
+        @as([*]const sim.DrawInfo, &(data[0][0])),
+        sim.bounds,
+    );
+}
+
+fn deserialize(
+    comptime Reader: type,
+    reader: Reader,
+    alloc: std.mem.Allocator,
+) !sim.State {
+    const data = try lib_deser.deserialize(
+        sim.DrawInfo,
+        reader,
+        alloc,
+    );
+
+    return sim.unrender_grid(data);
+}
 
 fn initial_sim_state() sim.State {
     var state = sim.emptyState;
@@ -59,6 +90,31 @@ fn initial_sim_state() sim.State {
     return state;
 }
 
+fn check_serde(
+    sim_state: sim.State,
+    alloc: std.mem.Allocator,
+) !void {
+    const buffer = try alloc.alloc(u8, 2000);
+    defer alloc.free(buffer);
+    var buf_stream = std.io.fixedBufferStream(buffer);
+
+    const sw = buf_stream.writer();
+
+    try serialize(@TypeOf(sw), sim_state, sw, alloc);
+
+    var buf_stream2 = std.io.fixedBufferStream(
+        buf_stream.getWritten(),
+    );
+    const sr = buf_stream2.reader();
+
+    const state2 = try deserialize(@TypeOf(sr), sr, alloc);
+
+    return if (std.meta.eql(sim_state, state2))
+        void{}
+    else
+        error.SerdeFailed;
+}
+
 pub fn main() !void {
     var arena =
         std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -98,7 +154,19 @@ pub fn main() !void {
         try ctl.draw(ctlstate, alloc, stdout);
         try bw.flush();
 
+        try check_serde(ctlstate.sim_state, alloc);
+
         std.debug.assert(arena.reset(.{ .free_all = {} }));
+    }
+
+    {
+        const filename = "dump_state.ys.txt";
+        const file = try std.fs.cwd().createFile(filename, .{});
+        defer file.close();
+
+        const fw = file.writer();
+
+        try serialize(@TypeOf(fw), ctlstate.sim_state, fw, alloc);
     }
 }
 
