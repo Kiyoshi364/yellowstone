@@ -213,8 +213,6 @@ fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
     } else unreachable;
 }
 
-const Term = if (isWindows) WindowsTerm else LinuxTerm;
-
 extern "kernel32" fn SetConsoleMode(
     in_hConsoleHandle: std.os.windows.HANDLE,
     in_dwMode: std.os.windows.DWORD,
@@ -226,32 +224,7 @@ const WindowsTerm = struct {
     stdoutHandle: std.os.windows.HANDLE,
     old_outMode: std.os.windows.DWORD,
 
-    fn unconfig_term(self: Term) !void {
-        const wink32 = std.os.windows.kernel32;
-
-        if (SetConsoleMode(self.stdinHandle, self.old_inMode) == 0) {
-            std.debug.print("{}\n", .{wink32.GetLastError()});
-            return error.SetConsoleModeError;
-        }
-
-        if (SetConsoleMode(self.stdinHandle, self.old_inMode) == 0) {
-            std.debug.print("{}\n", .{wink32.GetLastError()});
-            return error.SetConsoleModeError;
-        }
-    }
-};
-
-const LinuxTerm = struct {
-    old_term: std.os.termios,
-
-    fn unconfig_term(self: Term) !void {
-        const fd = 0;
-        try std.os.tcsetattr(fd, .NOW, self.old_term);
-    }
-};
-
-fn config_term() !Term {
-    if (isWindows) {
+    fn config_term() !WindowsTerm {
         // References:
         // https://learn.microsoft.com/en-us/windows/console/console-functions
         // https://learn.microsoft.com/en-us/windows/console/getconsolemode
@@ -339,7 +312,27 @@ fn config_term() !Term {
             .stdoutHandle = stdoutHandle,
             .old_outMode = outMode,
         };
-    } else {
+    }
+
+    fn unconfig_term(self: WindowsTerm) !void {
+        const wink32 = std.os.windows.kernel32;
+
+        if (SetConsoleMode(self.stdinHandle, self.old_inMode) == 0) {
+            std.debug.print("{}\n", .{wink32.GetLastError()});
+            return error.SetConsoleModeError;
+        }
+
+        if (SetConsoleMode(self.stdinHandle, self.old_inMode) == 0) {
+            std.debug.print("{}\n", .{wink32.GetLastError()});
+            return error.SetConsoleModeError;
+        }
+    }
+};
+
+const LinuxTerm = struct {
+    old_term: std.os.termios,
+
+    fn config_term() !LinuxTerm {
         const fd = 0;
         const old_term = try std.os.tcgetattr(fd);
         var new_term = old_term;
@@ -349,6 +342,17 @@ fn config_term() !Term {
             .old_term = old_term,
         };
     }
+
+    fn unconfig_term(self: LinuxTerm) !void {
+        const fd = 0;
+        try std.os.tcsetattr(fd, .NOW, self.old_term);
+    }
+};
+
+const Term = if (isWindows) WindowsTerm else LinuxTerm;
+
+fn config_term() !Term {
+    return Term.config_term();
 }
 
 const ST = std.builtin.StackTrace;
