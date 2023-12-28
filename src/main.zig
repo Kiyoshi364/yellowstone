@@ -8,6 +8,8 @@ pub const block = @import("block.zig");
 pub const sim = @import("simulation.zig");
 pub const ctl = @import("controler.zig");
 
+const argsParser = @import("argsParser.zig");
+
 var global_term: ?Term = null;
 
 fn serialize(
@@ -121,6 +123,65 @@ pub fn main() !void {
     defer arena.deinit();
     const alloc = arena.allocator();
 
+    const stdin_file = std.io.getStdIn().reader();
+    const stdout_file = std.io.getStdOut().writer();
+    const stderr_file = std.io.getStdErr().writer();
+
+    const cmd = blk: { // Parse Args
+        var argsIter = try std.process.argsWithAllocator(alloc);
+        defer argsIter.deinit();
+        std.debug.assert(argsIter.skip());
+
+        break :blk argsParser.parseArgs(
+            &argsIter,
+            stderr_file,
+        ) orelse {
+            std.os.exit(1);
+        };
+    };
+
+    return switch (cmd) {
+        .run => run(
+            &arena,
+            stdin_file,
+            stdout_file,
+            stderr_file,
+        ),
+        .replay => command_not_implemented(cmd, stderr_file),
+        .@"test" => command_not_implemented(cmd, stderr_file),
+        .record => command_not_implemented(cmd, stderr_file),
+    };
+}
+
+fn command_not_implemented(
+    cmd: argsParser.Command,
+    error_writer: anytype,
+) noreturn {
+    error_writer.print(
+        "command not implemented: {s}\n",
+        .{@tagName(@as(argsParser.CommandEnum, cmd))},
+    ) catch {};
+    std.os.exit(1);
+}
+
+fn run(
+    arena: *std.heap.ArenaAllocator,
+    stdin_file: anytype,
+    stdout_file: anytype,
+    stderr_file: anytype,
+) !void {
+    const alloc = arena.allocator();
+
+    var brin = std.io.bufferedReader(stdin_file);
+    const stdin = brin.reader();
+
+    var bwout = std.io.bufferedWriter(stdout_file);
+    const stdout = bwout.writer();
+
+    var bwerr = std.io.bufferedWriter(stderr_file);
+    const stderr = bwerr.writer();
+    _ = stderr;
+
     const controler = ctl.controler;
 
     const state = initial_sim_state();
@@ -130,21 +191,13 @@ pub fn main() !void {
         .cursor = .{0} ** 2,
     };
 
-    const stdin_file = std.io.getStdIn().reader();
-    var br = std.io.bufferedReader(stdin_file);
-    const stdin = br.reader();
-
     const term = try config_term();
     defer term.unconfig_term() catch unreachable;
     global_term = term;
     defer global_term = null;
 
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
-
     try ctl.draw(ctlstate, alloc, stdout);
-    try bw.flush();
+    try bwout.flush();
     while (true) {
         const ctlinput = try read_ctlinput(&stdin) orelse {
             break;
@@ -152,7 +205,7 @@ pub fn main() !void {
 
         ctlstate = try controler.step(ctlstate, ctlinput, alloc);
         try ctl.draw(ctlstate, alloc, stdout);
-        try bw.flush();
+        try bwout.flush();
 
         try check_serde(ctlstate.sim_state, alloc);
 
