@@ -5,6 +5,9 @@ pub const examples = @import("examples.zig");
 pub const sandboxed = @import("models/sandboxed.zig");
 pub const Sandboxed = sandboxed.Sandboxed;
 
+pub const sandboxed_mut = @import("models/sandboxed_mut.zig");
+pub const SandboxedMut = sandboxed_mut.SandboxedMut;
+
 pub const sandboxed_noalloc = @import("models/sandboxed_noalloc.zig");
 pub const SandboxedNoAlloc = sandboxed_noalloc.SandboxedNoAlloc;
 

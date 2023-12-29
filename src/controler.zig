@@ -23,7 +23,7 @@ const Uisize = @Type(.{ .Int = .{
     .signedness = .unsigned,
 } });
 
-pub const controler = lib_sim.Sandboxed(CtlState, CtlInput){
+pub const controler = lib_sim.SandboxedMut(CtlState, CtlInput){
     .update = update,
 };
 
@@ -217,11 +217,10 @@ fn DirPosIter(comptime Int: type) type {
 }
 
 fn update(
-    ctl: CtlState,
+    newctl: *CtlState,
     cinput: CtlInput,
     alloc: Allocator,
-) Allocator.Error!CtlState {
-    var newctl = ctl;
+) Allocator.Error!void {
     const bounds = [_]u8{
         @as(u8, @intCast(sim.bounds[0])),
         @as(u8, @intCast(sim.bounds[1])),
@@ -230,28 +229,26 @@ fn update(
     switch (cinput) {
         .step => {
             const input = .step;
-            newctl.sim_state =
-                try sim.simulation.update(
-                ctl.sim_state,
+            try sim.simulation.update(
+                &newctl.sim_state,
                 input,
                 alloc,
             );
-            newctl.time_count = ctl.time_count +| 1;
+            newctl.time_count = newctl.time_count +| 1;
         },
         .putBlock => {
             const input = SimInput{ .putBlock = .{
-                .z = ctl.cursor[0],
-                .y = ctl.cursor[1],
-                .x = ctl.cursor[2],
-                .block = ctl.block_state[ctl.curr_block],
+                .z = newctl.cursor[0],
+                .y = newctl.cursor[1],
+                .x = newctl.cursor[2],
+                .block = newctl.block_state[newctl.curr_block],
             } };
-            newctl.sim_state =
-                try sim.simulation.update(
-                ctl.sim_state,
+            try sim.simulation.update(
+                &newctl.sim_state,
                 input,
                 alloc,
             );
-            newctl.input_count = ctl.input_count +| 1;
+            newctl.input_count = newctl.input_count +| 1;
             newctl.last_input = input;
         },
         .moveCursor => |de| if (newctl.camera.perspective_de(de)
@@ -315,7 +312,6 @@ fn update(
         .prevRotate => newctl.block_state[newctl.curr_block] =
             newctl.block_state[newctl.curr_block].prevRotate(),
     }
-    return newctl;
 }
 
 fn print_repeat_ln(

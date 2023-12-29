@@ -30,9 +30,10 @@ fn serialize(
 
 fn deserialize(
     comptime Reader: type,
+    out_state: *sim.State,
     reader: Reader,
     alloc: std.mem.Allocator,
-) !sim.State {
+) !void {
     const deser = try lib_deser.deserialize(
         sim.DrawInfo,
         reader,
@@ -40,11 +41,21 @@ fn deserialize(
     );
     std.debug.assert(std.meta.eql(deser.bounds, sim.bounds));
 
-    return sim.unrender_grid(deser.data);
+    return sim.unrender_grid(deser.data, out_state);
 }
 
-fn initial_sim_state() sim.State {
-    var state = sim.emptyState;
+fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State {
+    const total = sim.bounds[0] * sim.bounds[1] * sim.bounds[2];
+    std.debug.assert(block_grid.len == total);
+    std.debug.assert(power_grid.len == total);
+
+    const state = sim.State{
+        .block_grid = block_grid,
+        .power_grid = power_grid,
+    };
+
+    for (block_grid[0..total]) |*b| b.* = .empty;
+    for (power_grid[0..total]) |*p| p.* = .empty;
 
     state.block_grid[state.get_index(.{ 0, 5, 0 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 0, 6, 0 })] = .{
@@ -109,6 +120,7 @@ fn initial_sim_state() sim.State {
 
 fn check_serde(
     sim_state: sim.State,
+    temp_sim_state: *sim.State,
     alloc: std.mem.Allocator,
 ) !void {
     const buffer = try alloc.alloc(u8, 2000);
@@ -124,9 +136,9 @@ fn check_serde(
     );
     const sr = buf_stream2.reader();
 
-    const state2 = try deserialize(@TypeOf(sr), sr, alloc);
+    try deserialize(@TypeOf(sr), temp_sim_state, sr, alloc);
 
-    return if (eq_sim_state(sim_state, state2))
+    return if (eq_sim_state(sim_state, temp_sim_state.*))
         void{}
     else
         error.SerdeFailed;
@@ -188,12 +200,12 @@ fn command_not_implemented(
 }
 
 fn run(
-    arena: *std.heap.ArenaAllocator,
+    main_arena: *std.heap.ArenaAllocator,
     stdin_file: anytype,
     stdout_file: anytype,
     stderr_file: anytype,
 ) !void {
-    const alloc = arena.allocator();
+    const main_alloc = main_arena.allocator();
 
     var brin = std.io.bufferedReader(stdin_file);
     const stdin = brin.reader();
@@ -207,19 +219,35 @@ fn run(
 
     const controler = ctl.controler;
 
-    const state = initial_sim_state();
+    var ctlstates = blk: {
+        var ctlstates = @as([2]ctl.CtlState, undefined);
 
-    var ctlstate = ctl.CtlState{
-        .sim_state = state,
-        .cursor = .{0} ** 3,
+        for (0..ctlstates.len) |i| {
+            const state = blk2: {
+                const len = sim.bounds[0] * sim.bounds[1] * sim.bounds[2];
+                const block_grid = try main_alloc.alloc(sim.Block, len);
+                errdefer main_alloc.free(block_grid);
+                const power_grid = try main_alloc.alloc(sim.Power, len);
+                break :blk2 initial_sim_state(block_grid, power_grid);
+            };
+            ctlstates[i] = .{
+                .sim_state = state,
+                .camera = .{ .pos = .{ 1, 0, 0 } },
+            };
+        }
+        break :blk ctlstates;
     };
+
+    var arena = std.heap.ArenaAllocator.init(main_alloc);
+    defer arena.deinit();
+    const alloc = arena.allocator();
 
     const term = try config_term();
     defer term.unconfig_term() catch unreachable;
     global_term = term;
     defer global_term = null;
 
-    try ctl.draw(ctlstate, alloc, stdout);
+    try ctl.draw(ctlstates[0], alloc, stdout);
     try bwout.flush();
 
     while (true) {
@@ -227,11 +255,11 @@ fn run(
             break;
         };
 
-        ctlstate = try controler.step(ctlstate, ctlinput, alloc);
-        try ctl.draw(ctlstate, alloc, stdout);
+        try controler.step(&ctlstates[0], ctlinput, alloc);
+        try ctl.draw(ctlstates[0], alloc, stdout);
         try bwout.flush();
 
-        try check_serde(ctlstate.sim_state, alloc);
+        try check_serde(ctlstates[0].sim_state, &ctlstates[1].sim_state, alloc);
 
         std.debug.assert(arena.reset(.{ .free_all = {} }));
     }
@@ -243,7 +271,7 @@ fn run(
 
         const fw = file.writer();
 
-        try serialize(@TypeOf(fw), ctlstate.sim_state, fw, alloc);
+        try serialize(@TypeOf(fw), ctlstates[0].sim_state, fw, alloc);
     }
 }
 

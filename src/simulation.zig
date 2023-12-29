@@ -4,16 +4,16 @@ const Allocator = std.mem.Allocator;
 const lib_sim = @import("lib_sim");
 
 const block = @import("block.zig");
-const Block = block.Block;
+pub const Block = block.Block;
 
 const Direction = @import("Direction.zig");
 const DirectionEnum = Direction.DirectionEnum;
 const directions = DirectionEnum.directions;
 
 const power = @import("power.zig");
-const Power = power.Power;
+pub const Power = power.Power;
 
-pub const simulation = lib_sim.Sandboxed(State, Input){
+pub const simulation = lib_sim.SandboxedMut(State, Input){
     .update = update,
 };
 
@@ -22,8 +22,8 @@ pub const height = width / 2;
 pub const depth = 2;
 pub const bounds = [_]usize{ depth, height, width };
 pub const State = struct {
-    block_grid: [depth * height * width]Block,
-    power_grid: [depth * height * width]Power,
+    block_grid: []Block,
+    power_grid: []Power,
 
     pub const Pos = [3]usize;
 
@@ -69,16 +69,11 @@ pub const Input = union(enum) {
     putBlock: PutBlock,
 };
 
-pub const emptyState = @as(State, .{
-    .block_grid = .{.{ .empty = .{} }} ** (width * height * depth),
-    .power_grid = .{.empty} ** (width * height * depth),
-});
-
 fn update(
-    state: State,
+    state: *State,
     input: Input,
     alloc: Allocator,
-) Allocator.Error!State {
+) Allocator.Error!void {
     return switch (input) {
         .step => update_step(state, alloc),
         .putBlock => |put| update_putBlock(state, put, alloc),
@@ -86,11 +81,9 @@ fn update(
 }
 
 fn update_step(
-    state: State,
+    newstate: *State,
     alloc: Allocator,
-) Allocator.Error!State {
-    var newstate = state;
-
+) Allocator.Error!void {
     var mod_stack = std.ArrayList(State.Pos).init(alloc);
     defer mod_stack.deinit();
 
@@ -158,7 +151,7 @@ fn update_step(
 
     try inner_update(
         @TypeOf(mod_stack),
-        &newstate,
+        newstate,
         &mod_stack,
         .new_out,
     );
@@ -299,16 +292,13 @@ fn update_step(
             newstate.block_grid[i] = .{ .negator = neg.shift(curr_in) };
         }
     }
-    return newstate;
 }
 
 fn update_putBlock(
-    state: State,
+    newstate: *State,
     put: PutBlock,
     alloc: Allocator,
-) Allocator.Error!State {
-    var newstate = state;
-
+) Allocator.Error!void {
     var mod_stack = std.ArrayList(State.Pos).init(alloc);
     defer mod_stack.deinit();
 
@@ -354,11 +344,10 @@ fn update_putBlock(
 
     try inner_update(
         @TypeOf(mod_stack),
-        &newstate,
+        newstate,
         &mod_stack,
         .old_out,
     );
-    return newstate;
 }
 
 /// update marked power
@@ -650,20 +639,13 @@ pub fn render_grid(
 
 pub fn unrender_grid(
     data_slice: []DrawInfo,
-) State {
-    var block_grid = @as([depth * height * width]Block, undefined);
-    var power_grid = @as([depth * height * width]Power, undefined);
-
+    out_state: *State,
+) void {
     for (data_slice, 0..) |data, i| {
         const pair = data.to_block_power();
-        block_grid[i] = pair.b;
-        power_grid[i] = pair.p;
+        out_state.block_grid[i] = pair.b;
+        out_state.power_grid[i] = pair.p;
     }
-
-    return State{
-        .block_grid = block_grid,
-        .power_grid = power_grid,
-    };
 }
 
 pub const DrawInfo = struct {
