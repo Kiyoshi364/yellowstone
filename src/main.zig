@@ -65,7 +65,12 @@ fn initial_sim_state() sim.State {
         .comparator = .{ .facing = .Down },
     };
     state.power_grid[state.get_index(.{ 1, 1, 9 })] = .comparator;
+    state.block_grid[state.get_index(.{ 1, 1, 11 })] = .{ .led = .{} };
     state.block_grid[state.get_index(.{ 1, 2, 9 })] = .{ .wire = .{} };
+    state.block_grid[state.get_index(.{ 1, 2, 11 })] = .{
+        .repeater = .{ .facing = .Up },
+    };
+    state.power_grid[state.get_index(.{ 1, 2, 11 })] = .repeater;
     state.block_grid[state.get_index(.{ 1, 3, 2 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 1, 3, 3 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 1, 3, 4 })] = .{ .wire = .{} };
