@@ -222,6 +222,11 @@ fn update(
     alloc: Allocator,
 ) Allocator.Error!CtlState {
     var newctl = ctl;
+    const bounds = [_]u8{
+        @as(u8, @intCast(sim.bounds[0])),
+        @as(u8, @intCast(sim.bounds[1])),
+        @as(u8, @intCast(sim.bounds[2])),
+    };
     switch (cinput) {
         .step => {
             const input = .step;
@@ -253,7 +258,7 @@ fn update(
             .inbounds_arr(
             u8,
             newctl.cursor,
-            [_]u8{ sim.depth, sim.height, sim.width },
+            bounds,
         )) |npos| {
             newctl.cursor = npos;
             newctl.camera.mut_follow_cursor(newctl.cursor);
@@ -409,6 +414,11 @@ pub fn draw(
     writer: anytype,
 ) !void {
     const state = ctl.sim_state;
+    const bounds = .{
+        sim.bounds[0],
+        sim.bounds[1],
+        sim.bounds[2],
+    };
 
     const camera = ctl.camera;
     const line_width = camera.dim[2] + 1;
@@ -430,7 +440,7 @@ pub fn draw(
         };
         break :blk DirPosIter(isize).init(
             camera.dir(.z),
-            .{ sim.depth, sim.height, sim.width },
+            bounds,
             pos,
             camera.dim[0] + 1,
         );
@@ -439,7 +449,7 @@ pub fn draw(
     while (try screen_above_iter.next_ib_pos()) |k_ib_pos| {
         var screen_down_iter = DirPosIter(isize).init(
             camera.dir(.y),
-            .{ sim.depth, sim.height, sim.width },
+            bounds,
             k_ib_pos.pos,
             camera.dim[1] + 1,
         );
@@ -456,7 +466,7 @@ pub fn draw(
             { // build line_buffer
                 var screen_right_iter = DirPosIter(isize).init(
                     camera.dir(.x),
-                    .{ sim.depth, sim.height, sim.width },
+                    bounds,
                     jpos,
                     camera.dim[2] + 1,
                 );
@@ -492,7 +502,7 @@ pub fn draw(
             if (is_cursor_in_this_line) {
                 var screen_right_iter = DirPosIter(isize).init(
                     camera.dir(.x),
-                    .{ sim.depth, sim.height, sim.width },
+                    bounds,
                     jpos,
                     camera.dim[2] + 1,
                 );
