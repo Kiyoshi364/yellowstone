@@ -23,7 +23,7 @@ fn serialize(
     try lib_deser.serialize(
         sim.DrawInfo,
         writer,
-        @as([*]const sim.DrawInfo, &(data[0][0])),
+        data.ptr,
         sim.bounds,
     );
 }
@@ -45,50 +45,59 @@ fn deserialize(
 fn initial_sim_state() sim.State {
     var state = sim.emptyState;
 
-    state.block_grid[0][5][0] = .{ .wire = .{} };
-    state.block_grid[0][6][0] = .{
+    state.block_grid[state.get_index(.{ 0, 5, 0 })] = .{ .wire = .{} };
+    state.block_grid[state.get_index(.{ 0, 6, 0 })] = .{
         .repeater = block.Repeater.init(.Up, .two),
     };
-    state.power_grid[0][6][0] = .repeater;
-    state.block_grid[0][7][0] = .{ .wire = .{} };
+    state.power_grid[state.get_index(.{ 0, 6, 0 })] = .repeater;
+    state.block_grid[state.get_index(.{ 0, 7, 0 })] = .{ .wire = .{} };
 
-    state.block_grid[1][0] = .{.{ .wire = .{} }} ** sim.width;
-    state.block_grid[1][2] = .{.{ .wire = .{} }} ** 8 ++
-        .{.empty} ** (sim.width - 8);
-    state.block_grid[1][1][7] = .{ .wire = .{} };
-    state.block_grid[1][1][9] = .{
+    for (0..sim.bounds[2]) |i| {
+        state.block_grid[state.get_index(.{ 1, 0, i })] = .{ .wire = .{} };
+        state.block_grid[state.get_index(.{ 1, 2, i })] =
+            if (i < 8)
+            .{ .wire = .{} }
+        else
+            .empty;
+    }
+    state.block_grid[state.get_index(.{ 1, 1, 7 })] = .{ .wire = .{} };
+    state.block_grid[state.get_index(.{ 1, 1, 9 })] = .{
         .comparator = .{ .facing = .Down },
     };
-    state.power_grid[1][1][9] = .comparator;
-    state.block_grid[1][2][9] = .{ .wire = .{} };
-    state.block_grid[1][3][2] = .{ .wire = .{} };
-    state.block_grid[1][3][3] = .{ .wire = .{} };
-    state.block_grid[1][3][4] = .{ .wire = .{} };
-    state.block_grid[1][3][7] = .{ .wire = .{} };
-    state.block_grid[1][3][9] = .{ .wire = .{} };
-    state.block_grid[1][3][10] = .{
+    state.power_grid[state.get_index(.{ 1, 1, 9 })] = .comparator;
+    state.block_grid[state.get_index(.{ 1, 2, 9 })] = .{ .wire = .{} };
+    state.block_grid[state.get_index(.{ 1, 3, 2 })] = .{ .wire = .{} };
+    state.block_grid[state.get_index(.{ 1, 3, 3 })] = .{ .wire = .{} };
+    state.block_grid[state.get_index(.{ 1, 3, 4 })] = .{ .wire = .{} };
+    state.block_grid[state.get_index(.{ 1, 3, 7 })] = .{ .wire = .{} };
+    state.block_grid[state.get_index(.{ 1, 3, 9 })] = .{ .wire = .{} };
+    state.block_grid[state.get_index(.{ 1, 3, 10 })] = .{
         .repeater = block.Repeater.init(.Right, .two),
     };
-    state.power_grid[1][3][10] = .repeater;
-    state.block_grid[1][3][11] = .{ .block = .{} };
-    state.block_grid[1][4][4] = .{ .led = .{} };
-    state.block_grid[1][5][0] = .{
+    state.power_grid[state.get_index(.{ 1, 3, 10 })] = .repeater;
+    state.block_grid[state.get_index(.{ 1, 3, 11 })] = .{ .block = .{} };
+    state.block_grid[state.get_index(.{ 1, 4, 4 })] = .{ .led = .{} };
+    state.block_grid[state.get_index(.{ 1, 5, 0 })] = .{
         .negator = .{ .facing = .Above },
     };
-    state.power_grid[1][5][0] = .negator;
-    state.block_grid[1][6] = .{.{ .led = .{} }} ** sim.width;
-    state.block_grid[1][6][0] = .{ .block = .{} };
-    state.block_grid[1][6][1] = .{ .wire = .{} };
-    state.block_grid[1][6][2] = .{
+    state.power_grid[state.get_index(.{ 1, 5, 0 })] = .negator;
+    for (0..sim.bounds[2]) |i| {
+        state.block_grid[state.get_index(.{ 1, 6, i })] = .{ .led = .{} };
+    }
+    state.block_grid[state.get_index(.{ 1, 6, 0 })] = .{ .block = .{} };
+    state.block_grid[state.get_index(.{ 1, 6, 1 })] = .{ .wire = .{} };
+    state.block_grid[state.get_index(.{ 1, 6, 2 })] = .{
         .comparator = .{ .facing = .Right },
     };
-    state.power_grid[1][6][2] = .comparator;
-    state.block_grid[1][6][3] = .{ .wire = .{} };
-    state.block_grid[1][7] = .{.{ .wire = .{} }} ** sim.width;
-    state.block_grid[1][7][2] = .{
+    state.power_grid[state.get_index(.{ 1, 6, 2 })] = .comparator;
+    state.block_grid[state.get_index(.{ 1, 6, 3 })] = .{ .wire = .{} };
+    for (0..sim.bounds[2]) |i| {
+        state.block_grid[state.get_index(.{ 1, 7, i })] = .{ .wire = .{} };
+    }
+    state.block_grid[state.get_index(.{ 1, 7, 2 })] = .{
         .comparator = .{ .facing = .Left },
     };
-    state.power_grid[1][7][2] = .comparator;
+    state.power_grid[state.get_index(.{ 1, 7, 2 })] = .comparator;
     return state;
 }
 
@@ -111,10 +120,18 @@ fn check_serde(
 
     const state2 = try deserialize(@TypeOf(sr), sr, alloc);
 
-    return if (std.meta.eql(sim_state, state2))
+    return if (eq_sim_state(sim_state, state2))
         void{}
     else
         error.SerdeFailed;
+}
+
+fn eq_sim_state(st1: sim.State, st2: sim.State) bool {
+    return for (st1.block_grid, st2.block_grid) |b1, b2| {
+        if (!std.meta.eql(b1, b2)) break false;
+    } else for (st1.power_grid, st2.power_grid) |p1, p2| {
+        if (!std.meta.eql(p1, p2)) break false;
+    } else true;
 }
 
 pub fn main() !void {

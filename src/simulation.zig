@@ -22,10 +22,31 @@ pub const height = width / 2;
 pub const depth = 2;
 pub const bounds = [_]usize{ depth, height, width };
 pub const State = struct {
-    block_grid: [depth][height][width]Block,
-    power_grid: [depth][height][width]Power,
+    block_grid: [depth * height * width]Block,
+    power_grid: [depth * height * width]Power,
 
     pub const Pos = [3]usize;
+
+    pub fn get_index(self: State, pos: Pos) usize {
+        _ = self;
+        std.debug.assert(pos[0] < bounds[0]);
+        std.debug.assert(pos[1] < bounds[1]);
+        std.debug.assert(pos[2] < bounds[2]);
+
+        const zoff = pos[0] * bounds[1] * bounds[2];
+        const yoff = pos[1] * bounds[2];
+        const xoff = pos[2];
+        const index = zoff + yoff + xoff;
+        return index;
+    }
+
+    pub fn get_block_grid(self: State, pos: Pos) Block {
+        return self.block_grid[self.get_index(pos)];
+    }
+
+    pub fn get_power_grid(self: State, pos: Pos) Power {
+        return self.power_grid[self.get_index(pos)];
+    }
 
     const BlockIter = struct {
         z: usize = 0,
@@ -33,19 +54,19 @@ pub const State = struct {
         x: usize = 0,
 
         pub fn next_pos(self: *BlockIter) ?State.Pos {
-            if (self.z < depth) {
-                std.debug.assert(self.y < height);
-                std.debug.assert(self.x < width);
+            if (self.z < bounds[0]) {
+                std.debug.assert(self.y < bounds[1]);
+                std.debug.assert(self.x < bounds[2]);
                 const pos = State.Pos{ self.z, self.y, self.x };
-                if (self.x < width - 1) {
+                if (self.x < bounds[2] - 1) {
                     self.*.x += 1;
                 } else {
-                    std.debug.assert(self.x == width - 1);
+                    std.debug.assert(self.x == bounds[2] - 1);
                     self.*.x = 0;
-                    if (self.y < height - 1) {
+                    if (self.y < bounds[1] - 1) {
                         self.*.y += 1;
                     } else {
-                        std.debug.assert(self.y == height - 1);
+                        std.debug.assert(self.y == bounds[1] - 1);
                         self.*.y = 0;
                         self.*.z += 1;
                     }
@@ -84,11 +105,9 @@ pub const Input = union(enum) {
     putBlock: PutBlock,
 };
 
-pub const Render = *const [depth][height][width]DrawInfo;
-
 pub const emptyState = @as(State, .{
-    .block_grid = .{.{.{.{ .empty = .{} }} ** width} ** height} ** depth,
-    .power_grid = .{.{.{.empty} ** width} ** height} ** depth,
+    .block_grid = .{.{ .empty = .{} }} ** (width * height * depth),
+    .power_grid = .{.empty} ** (width * height * depth),
 });
 
 fn update(
@@ -114,10 +133,7 @@ fn update_step(
     { // push "delayed machines" interactions
         var block_it = State.BlockIter{};
         while (block_it.next_pos()) |pos| {
-            const z = pos[0];
-            const y = pos[1];
-            const x = pos[2];
-            const b = newstate.block_grid[z][y][x];
+            const b = newstate.get_block_grid(pos);
             switch (b) {
                 .empty,
                 .source,
@@ -187,10 +203,7 @@ fn update_step(
     { // For each repeater, shift input
         var block_it = State.BlockIter{};
         while (block_it.next_pos()) |pos| {
-            const z = pos[0];
-            const y = pos[1];
-            const x = pos[2];
-            const b = newstate.block_grid[z][y][x];
+            const b = newstate.get_block_grid(pos);
             if (b != .repeater) continue;
             const rep = b.repeater;
             const back_dir = rep.facing.back();
@@ -200,13 +213,13 @@ fn update_step(
                 const that_power = look_at_power(
                     .new_out,
                     back_dir,
-                    newstate.block_grid[bpos[0]][bpos[1]][bpos[2]],
-                    newstate.power_grid[bpos[0]][bpos[1]][bpos[2]],
+                    newstate.get_block_grid(bpos),
+                    newstate.get_power_grid(bpos),
                 ) catch |err| switch (err) {
                     error.InvalidPower => {
                         std.debug.print(
                             "this: (z: {}, y: {}, x: {}) b: {} - that: (z: {}, y: {}, x: {}) b:{} p: {}\n",
-                            .{ z, y, x, b, bpos[0], bpos[1], bpos[2], newstate.block_grid[bpos[0]][bpos[1]][bpos[2]], newstate.power_grid[bpos[0]][bpos[1]][bpos[2]] },
+                            .{ pos[0], pos[1], pos[2], b, bpos[0], bpos[1], bpos[2], newstate.get_block_grid(bpos), newstate.get_power_grid(bpos) },
                         );
                         unreachable;
                     },
@@ -218,17 +231,15 @@ fn update_step(
                     _ => unreachable,
                 };
             } else 0;
-            newstate.block_grid[z][y][x] = .{ .repeater = rep.shift(curr_in) };
+            newstate.block_grid[newstate.get_index(pos)] = .{ .repeater = rep.shift(curr_in) };
         }
     }
 
     { // For each comparator, shift input
         var block_it = State.BlockIter{};
         while (block_it.next_pos()) |pos| {
-            const z = pos[0];
-            const y = pos[1];
-            const x = pos[2];
-            const b = newstate.block_grid[z][y][x];
+            const idx = newstate.get_index(pos);
+            const b = newstate.block_grid[idx];
             if (b != .comparator) continue;
             const comp = b.comparator;
             const back_dir = comp.facing.back();
@@ -238,13 +249,13 @@ fn update_step(
                 const that_power = look_at_power(
                     .new_out,
                     back_dir,
-                    newstate.block_grid[bpos[0]][bpos[1]][bpos[2]],
-                    newstate.power_grid[bpos[0]][bpos[1]][bpos[2]],
+                    newstate.get_block_grid(bpos),
+                    newstate.get_power_grid(bpos),
                 ) catch |err| switch (err) {
                     error.InvalidPower => {
                         std.debug.print(
                             "this: (z: {}, y: {}, x: {}) b: {} - that: (z: {}, y: {}, x: {}) b:{} p: {}\n",
-                            .{ z, y, x, b, bpos[0], bpos[1], bpos[2], newstate.block_grid[bpos[0]][bpos[1]][bpos[2]], newstate.power_grid[bpos[0]][bpos[1]][bpos[2]] },
+                            .{ pos[0], pos[1], pos[2], b, bpos[0], bpos[1], bpos[2], newstate.get_block_grid(bpos), newstate.get_power_grid(bpos) },
                         );
                         unreachable;
                     },
@@ -267,13 +278,13 @@ fn update_step(
                         const that_power = look_at_power(
                             .new_out,
                             de,
-                            newstate.block_grid[bpos[0]][bpos[1]][bpos[2]],
-                            newstate.power_grid[bpos[0]][bpos[1]][bpos[2]],
+                            newstate.get_block_grid(bpos),
+                            newstate.get_power_grid(bpos),
                         ) catch |err| switch (err) {
                             error.InvalidPower => {
                                 std.debug.print(
                                     "this: (z: {}, y: {}, x: {}) b: {} - that: (z: {}, y: {}, x: {}) b:{} p: {}\n",
-                                    .{ z, y, x, b, bpos[0], bpos[1], bpos[2], newstate.block_grid[bpos[0]][bpos[1]][bpos[2]], newstate.power_grid[bpos[0]][bpos[1]][bpos[2]] },
+                                    .{ pos[0], pos[1], pos[2], b, bpos[0], bpos[1], bpos[2], newstate.get_block_grid(bpos), newstate.get_power_grid(bpos) },
                                 );
                                 unreachable;
                             },
@@ -291,17 +302,14 @@ fn update_step(
                 }
                 break :blk h;
             };
-            newstate.block_grid[z][y][x] = .{ .comparator = comp.shift(curr_in, highest_side) };
+            newstate.block_grid[newstate.get_index(pos)] = .{ .comparator = comp.shift(curr_in, highest_side) };
         }
     }
 
     { // For each negator, shift input
         var block_it = State.BlockIter{};
         while (block_it.next_pos()) |pos| {
-            const z = pos[0];
-            const y = pos[1];
-            const x = pos[2];
-            const b = newstate.block_grid[z][y][x];
+            const b = newstate.get_block_grid(pos);
             if (b != .negator) continue;
             const neg = b.negator;
             const back_dir = neg.facing.back();
@@ -311,13 +319,13 @@ fn update_step(
                 const that_power = look_at_power(
                     .new_out,
                     back_dir,
-                    newstate.block_grid[bpos[0]][bpos[1]][bpos[2]],
-                    newstate.power_grid[bpos[0]][bpos[1]][bpos[2]],
+                    newstate.get_block_grid(bpos),
+                    newstate.get_power_grid(bpos),
                 ) catch |err| switch (err) {
                     error.InvalidPower => {
                         std.debug.print(
                             "this: (z: {}, y: {}, x: {}) b: {} - that: (z: {}, y: {}, x: {}) b:{} p: {}\n",
-                            .{ z, y, x, b, bpos[0], bpos[1], bpos[2], newstate.block_grid[bpos[0]][bpos[1]][bpos[2]], newstate.power_grid[bpos[0]][bpos[1]][bpos[2]] },
+                            .{ pos[0], pos[1], pos[2], b, bpos[0], bpos[1], bpos[2], newstate.get_power_grid(bpos), newstate.get_power_grid(bpos) },
                         );
                         unreachable;
                     },
@@ -329,7 +337,7 @@ fn update_step(
                     else => unreachable,
                 };
             } else 0;
-            newstate.block_grid[z][y][x] = .{ .negator = neg.shift(curr_in) };
+            newstate.block_grid[newstate.get_index(pos)] = .{ .negator = neg.shift(curr_in) };
         }
     }
     return newstate;
@@ -347,8 +355,9 @@ fn update_putBlock(
 
     { // handle putBlock
         const i = put;
-        newstate.block_grid[i.z][i.y][i.x] = i.block;
-        newstate.power_grid[i.z][i.y][i.x] = switch (i.block) {
+        const idx = newstate.get_index(.{ i.z, i.y, i.x });
+        newstate.block_grid[idx] = i.block;
+        newstate.power_grid[idx] = switch (i.block) {
             .empty => power.EMPTY_POWER,
             .source => power.SOURCE_POWER,
             .wire,
@@ -403,22 +412,19 @@ fn inner_update(
     choose_output: MachineOut,
 ) Allocator.Error!void {
     while (mod_stack.popOrNull()) |pos| {
-        const z = pos[0];
-        const y = pos[1];
-        const x = pos[2];
-        const b = newstate.block_grid[z][y][x];
+        const b = newstate.get_block_grid(pos);
         switch (b) {
             .empty => {
                 const empty_is_ok = std.meta.eql(
                     power.EMPTY_POWER,
-                    newstate.power_grid[z][y][x],
+                    newstate.get_power_grid(pos),
                 );
                 std.debug.assert(empty_is_ok);
             },
             .source => {
                 const source_is_ok = std.meta.eql(
                     power.SOURCE_POWER,
-                    newstate.power_grid[z][y][x],
+                    newstate.get_power_grid(pos),
                 );
                 std.debug.assert(source_is_ok);
             },
@@ -427,9 +433,7 @@ fn inner_update(
                 newstate,
                 mod_stack,
                 choose_output,
-                z,
-                y,
-                x,
+                pos,
                 b,
             ),
             .block, .led => try update_block_or_led(
@@ -437,15 +441,13 @@ fn inner_update(
                 newstate,
                 mod_stack,
                 choose_output,
-                z,
-                y,
-                x,
+                pos,
                 b,
             ),
             .repeater => |r| {
                 const repeater_is_ok = std.meta.eql(
                     power.REPEATER_POWER,
-                    newstate.power_grid[z][y][x],
+                    newstate.get_power_grid(pos),
                 );
                 std.debug.assert(repeater_is_ok);
                 std.debug.assert(r.is_valid());
@@ -453,14 +455,14 @@ fn inner_update(
             .comparator => {
                 const comparator_is_ok = std.meta.eql(
                     power.COMPARATOR_POWER,
-                    newstate.power_grid[z][y][x],
+                    newstate.get_power_grid(pos),
                 );
                 std.debug.assert(comparator_is_ok);
             },
             .negator => {
                 const negator_is_ok = std.meta.eql(
                     power.NEGATOR_POWER,
-                    newstate.power_grid[z][y][x],
+                    newstate.get_power_grid(pos),
                 );
                 std.debug.assert(negator_is_ok);
             },
@@ -473,30 +475,25 @@ fn update_wire(
     newstate: *State,
     mod_stack: *Stack,
     choose_output: MachineOut,
-    z: usize,
-    y: usize,
-    x: usize,
+    pos: [3]usize,
     b: Block,
 ) Allocator.Error!void {
     std.debug.assert(b == .wire);
     var this_power = Power.empty;
     for (directions) |de| {
         std.debug.assert(0 <= @intFromEnum(this_power));
-        if (de.inbounds(usize, z, y, x, bounds)) |npos| {
-            const nz = npos[0];
-            const ny = npos[1];
-            const nx = npos[2];
-            const that_block = newstate.block_grid[nz][ny][nx];
+        if (de.inbounds_arr(usize, pos, bounds)) |npos| {
+            const that_block = newstate.get_block_grid(npos);
             const that_power = look_at_power(
                 choose_output,
                 de,
                 that_block,
-                newstate.power_grid[nz][ny][nx],
+                newstate.get_power_grid(npos),
             ) catch |err| switch (err) {
                 error.InvalidPower => {
                     std.debug.print(
                         "this: (z: {}, y: {}, x: {}) b: {} - that: (z: {}, y: {}, x: {}) b:{} p: {}\n",
-                        .{ z, y, x, b, nz, ny, nx, that_block, newstate.power_grid[nz][ny][nx] },
+                        .{ pos[0], pos[1], pos[2], b, npos[0], npos[1], npos[2], that_block, newstate.get_power_grid(npos) },
                     );
                     unreachable;
                 },
@@ -530,10 +527,10 @@ fn update_wire(
             };
         }
     }
-    if (this_power != newstate.power_grid[z][y][x]) {
-        newstate.power_grid[z][y][x] = this_power;
+    if (this_power != newstate.get_power_grid(pos)) {
+        newstate.power_grid[newstate.get_index(pos)] = this_power;
         for (directions) |de| {
-            if (de.inbounds(usize, z, y, x, bounds)) |npos| {
+            if (de.inbounds_arr(usize, pos, bounds)) |npos| {
                 try mod_stack.append(npos);
             }
         }
@@ -545,9 +542,7 @@ fn update_block_or_led(
     newstate: *State,
     mod_stack: *Stack,
     choose_output: MachineOut,
-    z: usize,
-    y: usize,
-    x: usize,
+    pos: [3]usize,
     b: Block,
 ) Allocator.Error!void {
     std.debug.assert(b == .block or b == .led);
@@ -556,21 +551,18 @@ fn update_block_or_led(
         std.debug.assert(this_power == power.BLOCK_OFF_POWER or
             this_power == power.BLOCK_ON_POWER or
             this_power == power.SOURCE_POWER);
-        if (de.inbounds(usize, z, y, x, bounds)) |npos| {
-            const nz = npos[0];
-            const ny = npos[1];
-            const nx = npos[2];
-            const that_block = newstate.block_grid[nz][ny][nx];
+        if (de.inbounds_arr(usize, pos, bounds)) |npos| {
+            const that_block = newstate.get_block_grid(npos);
             const that_power = look_at_power(
                 choose_output,
                 de,
                 that_block,
-                newstate.power_grid[nz][ny][nx],
+                newstate.get_power_grid(npos),
             ) catch |err| switch (err) {
                 error.InvalidPower => {
                     std.debug.print(
                         "this: (z: {}, y: {}, x: {}) b: {} - that: (z: {}, y: {}, x: {}) b:{} p: {}\n",
-                        .{ z, y, x, b, nz, ny, nx, that_block, newstate.power_grid[nz][ny][nx] },
+                        .{ pos[0], pos[1], pos[2], b, npos[0], npos[1], npos[2], that_block, newstate.get_power_grid(npos) },
                     );
                     unreachable;
                 },
@@ -609,10 +601,10 @@ fn update_block_or_led(
             };
         }
     }
-    if (this_power != newstate.power_grid[z][y][x]) {
-        newstate.power_grid[z][y][x] = this_power;
+    if (this_power != newstate.get_power_grid(pos)) {
+        newstate.power_grid[newstate.get_index(pos)] = this_power;
         for (directions) |de| {
-            if (de.inbounds(usize, z, y, x, bounds)) |npos| {
+            if (de.inbounds_arr(usize, pos, bounds)) |npos| {
                 try mod_stack.append(npos);
             }
         }
@@ -687,16 +679,12 @@ fn look_at_power(
 pub fn render_grid(
     state: State,
     alloc: Allocator,
-) Allocator.Error!Render {
-    const canvas: *[depth][height][width]DrawInfo =
-        try alloc.create([depth][height][width]DrawInfo);
-    for (state.block_grid, 0..) |plane, z| {
-        for (plane, 0..) |row, y| {
-            for (row, 0..) |b, x| {
-                const this_power = state.power_grid[z][y][x];
-                canvas.*[z][y][x] = DrawInfo.init(b, this_power);
-            }
-        }
+) Allocator.Error![]DrawInfo {
+    const canvas: []DrawInfo =
+        try alloc.alloc(DrawInfo, depth * height * width);
+    for (state.block_grid, 0..) |b, i| {
+        const this_power = state.power_grid[i];
+        canvas[i] = DrawInfo.init(b, this_power);
     }
     return canvas;
 }
@@ -704,15 +692,13 @@ pub fn render_grid(
 pub fn unrender_grid(
     data_slice: []DrawInfo,
 ) State {
-    var block_grid = @as([depth][height][width]Block, undefined);
-    var power_grid = @as([depth][height][width]Power, undefined);
+    var block_grid = @as([depth * height * width]Block, undefined);
+    var power_grid = @as([depth * height * width]Power, undefined);
 
-    const block_ptr = @as([*]Block, @ptrCast(&block_grid))[0..(depth * height * width)];
-    const power_ptr = @as([*]Power, @ptrCast(&power_grid))[0..(depth * height * width)];
     for (data_slice, 0..) |data, i| {
         const pair = data.to_block_power();
-        block_ptr[i] = pair.b;
-        power_ptr[i] = pair.p;
+        block_grid[i] = pair.b;
+        power_grid[i] = pair.p;
     }
 
     return State{
