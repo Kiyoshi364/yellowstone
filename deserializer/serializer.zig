@@ -322,11 +322,18 @@ pub fn serialize(
     }
 }
 
+pub fn Deser(comptime Data: type) type {
+    return struct {
+        data: []Data,
+        bounds: [3]usize,
+    };
+}
+
 pub fn deserialize(
     comptime Data: type,
     reader: anytype,
     alloc: std.mem.Allocator,
-) ![]Data {
+) !Deser(Data) {
     const bounds = try read_header(reader);
 
     const data = try alloc.alloc(
@@ -363,5 +370,8 @@ pub fn deserialize(
         );
     }
 
-    return data;
+    return Deser(Data){
+        .data = data,
+        .bounds = bounds,
+    };
 }

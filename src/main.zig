@@ -33,13 +33,14 @@ fn deserialize(
     reader: Reader,
     alloc: std.mem.Allocator,
 ) !sim.State {
-    const data = try lib_deser.deserialize(
+    const deser = try lib_deser.deserialize(
         sim.DrawInfo,
         reader,
         alloc,
     );
+    std.debug.assert(std.meta.eql(deser.bounds, sim.bounds));
 
-    return sim.unrender_grid(data);
+    return sim.unrender_grid(deser.data);
 }
 
 fn initial_sim_state() sim.State {
@@ -210,7 +211,7 @@ fn run(
 
     var ctlstate = ctl.CtlState{
         .sim_state = state,
-        .cursor = .{0} ** 2,
+        .cursor = .{0} ** 3,
     };
 
     const term = try config_term();
@@ -220,6 +221,7 @@ fn run(
 
     try ctl.draw(ctlstate, alloc, stdout);
     try bwout.flush();
+
     while (true) {
         const ctlinput = try read_ctlinput(&stdin) orelse {
             break;
