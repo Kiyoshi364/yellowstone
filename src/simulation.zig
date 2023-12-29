@@ -63,7 +63,7 @@ test "State compiles!" {
 }
 
 pub const MachineOut = enum { old_out, new_out };
-pub const PutBlock = struct { z: u8, y: u8, x: u8, block: Block };
+pub const PutBlock = struct { pos: [3]u16, block: Block };
 pub const Input = union(enum) {
     step,
     putBlock: PutBlock,
@@ -303,10 +303,10 @@ fn update_putBlock(
     defer mod_stack.deinit();
 
     { // handle putBlock
-        const i = put;
-        const idx = state.get_index(.{ i.z, i.y, i.x });
-        state.block_grid[idx] = i.block;
-        state.power_grid[idx] = switch (i.block) {
+        const pos = .{ put.pos[0], put.pos[1], put.pos[2] };
+        const idx = state.get_index(pos);
+        state.block_grid[idx] = put.block;
+        state.power_grid[idx] = switch (put.block) {
             .empty => power.EMPTY_POWER,
             .source => power.SOURCE_POWER,
             .wire,
@@ -321,11 +321,11 @@ fn update_putBlock(
             .negator => power.NEGATOR_POWER,
         };
         for (directions) |de| {
-            if (de.inbounds(usize, i.z, i.y, i.x, bounds)) |npos| {
+            if (de.inbounds_arr(usize, pos, bounds)) |npos| {
                 try mod_stack.append(npos);
             }
         }
-        const should_update = switch (i.block) {
+        const should_update = switch (put.block) {
             .empty,
             .source,
             .repeater,
@@ -338,7 +338,7 @@ fn update_putBlock(
             => true,
         };
         if (should_update) {
-            try mod_stack.append(State.Pos{ i.z, i.y, i.x });
+            try mod_stack.append(pos);
         }
     }
 

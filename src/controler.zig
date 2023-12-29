@@ -82,7 +82,7 @@ const Camera = struct {
             b;
     }
 
-    fn is_cursor_inside(camera: Camera, cursor: [3]u8) bool {
+    fn is_cursor_inside(camera: Camera, cursor: [3]u16) bool {
         return for (0..3) |i| {
             if (!(camera.pos[i] <= cursor[i] and
                 cursor[i] - camera.pos[i] <= camera.dim[i]))
@@ -94,7 +94,7 @@ const Camera = struct {
 
     fn mut_follow_cursor(
         camera: *Camera,
-        cursor: [3]u8,
+        cursor: [3]u16,
     ) void {
         if (camera.is_cursor_inside(cursor))
             void{}
@@ -114,7 +114,7 @@ pub const CtlState = struct {
     time_count: usize = 0,
     sim_state: SimState,
     last_input: ?SimInput = null,
-    cursor: [3]u8,
+    cursor: [3]u16,
     camera: Camera = .{},
     block_state: @TypeOf(starting_block_state) = starting_block_state,
     curr_block: usize = 0,
@@ -221,10 +221,10 @@ fn update(
     cinput: CtlInput,
     alloc: Allocator,
 ) Allocator.Error!void {
-    const bounds = [_]u8{
-        @as(u8, @intCast(sim.bounds[0])),
-        @as(u8, @intCast(sim.bounds[1])),
-        @as(u8, @intCast(sim.bounds[2])),
+    const bounds = [_]u16{
+        @intCast(sim.bounds[0]),
+        @intCast(sim.bounds[1]),
+        @intCast(sim.bounds[2]),
     };
     switch (cinput) {
         .step => {
@@ -238,9 +238,7 @@ fn update(
         },
         .putBlock => {
             const input = SimInput{ .putBlock = .{
-                .z = ctl.cursor[0],
-                .y = ctl.cursor[1],
-                .x = ctl.cursor[2],
+                .pos = ctl.cursor,
                 .block = ctl.block_state[ctl.curr_block],
             } };
             try sim.simulation.update(
@@ -253,7 +251,7 @@ fn update(
         },
         .moveCursor => |de| if (ctl.camera.perspective_de(de)
             .inbounds_arr(
-            u8,
+            u16,
             ctl.cursor,
             bounds,
         )) |npos| {
@@ -332,12 +330,10 @@ fn print_input_ln(writer: anytype, input_count: usize, m_input: ?sim.Input) !voi
         std.debug.assert(input == .putBlock);
         const i = input.putBlock;
         try writer.print("= Input({d}): ", .{input_count});
-        try writer.print("Put .{s} at (z: {}, y: {}, x: {})", .{
-            @tagName(i.block),
-            i.z,
-            i.y,
-            i.x,
-        });
+        try writer.print(
+            "Put .{s} at (z: {}, y: {}, x: {})",
+            .{ @tagName(i.block), i.pos[0], i.pos[1], i.pos[2] },
+        );
     } else {
         try writer.print("= Start", .{});
     }
