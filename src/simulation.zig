@@ -27,6 +27,14 @@ pub const State = struct {
 
     pub const Pos = [3]usize;
 
+    pub fn get_pos(self: State, i: usize) Pos {
+        _ = self;
+        const x = i % bounds[2];
+        const y = (i / bounds[2]) % bounds[1];
+        const z = (i / bounds[2]) / bounds[1];
+        return .{ z, y, x };
+    }
+
     pub fn get_index(self: State, pos: Pos) usize {
         _ = self;
         std.debug.assert(pos[0] < bounds[0]);
@@ -47,50 +55,6 @@ pub const State = struct {
     pub fn get_power_grid(self: State, pos: Pos) Power {
         return self.power_grid[self.get_index(pos)];
     }
-
-    const BlockIter = struct {
-        z: usize = 0,
-        y: usize = 0,
-        x: usize = 0,
-
-        pub fn next_pos(self: *BlockIter) ?State.Pos {
-            if (self.z < bounds[0]) {
-                std.debug.assert(self.y < bounds[1]);
-                std.debug.assert(self.x < bounds[2]);
-                const pos = State.Pos{ self.z, self.y, self.x };
-                if (self.x < bounds[2] - 1) {
-                    self.*.x += 1;
-                } else {
-                    std.debug.assert(self.x == bounds[2] - 1);
-                    self.*.x = 0;
-                    if (self.y < bounds[1] - 1) {
-                        self.*.y += 1;
-                    } else {
-                        std.debug.assert(self.y == bounds[1] - 1);
-                        self.*.y = 0;
-                        self.*.z += 1;
-                    }
-                }
-                return pos;
-            } else {
-                return null;
-            }
-        }
-
-        pub fn next_block(self: *BlockIter, state: State) ?Block {
-            return if (self.next_pos()) |pos|
-                state.block_grid[pos[0]][pos[1]][pos[2]]
-            else
-                null;
-        }
-
-        pub fn next_power(self: *BlockIter, state: State) ?Power {
-            return if (self.next_pos()) |pos|
-                state.power_grid[pos[0]][pos[1]][pos[2]]
-            else
-                null;
-        }
-    };
 };
 
 test "State compiles!" {
@@ -131,9 +95,8 @@ fn update_step(
     defer mod_stack.deinit();
 
     { // push "delayed machines" interactions
-        var block_it = State.BlockIter{};
-        while (block_it.next_pos()) |pos| {
-            const b = newstate.get_block_grid(pos);
+        for (newstate.block_grid, 0..) |b, i| {
+            const pos = newstate.get_pos(i);
             switch (b) {
                 .empty,
                 .source,
@@ -201,9 +164,8 @@ fn update_step(
     );
 
     { // For each repeater, shift input
-        var block_it = State.BlockIter{};
-        while (block_it.next_pos()) |pos| {
-            const b = newstate.get_block_grid(pos);
+        for (newstate.block_grid, 0..) |b, i| {
+            const pos = newstate.get_pos(i);
             if (b != .repeater) continue;
             const rep = b.repeater;
             const back_dir = rep.facing.back();
@@ -231,15 +193,13 @@ fn update_step(
                     _ => unreachable,
                 };
             } else 0;
-            newstate.block_grid[newstate.get_index(pos)] = .{ .repeater = rep.shift(curr_in) };
+            newstate.block_grid[i] = .{ .repeater = rep.shift(curr_in) };
         }
     }
 
     { // For each comparator, shift input
-        var block_it = State.BlockIter{};
-        while (block_it.next_pos()) |pos| {
-            const idx = newstate.get_index(pos);
-            const b = newstate.block_grid[idx];
+        for (newstate.block_grid, 0..) |b, i| {
+            const pos = newstate.get_pos(i);
             if (b != .comparator) continue;
             const comp = b.comparator;
             const back_dir = comp.facing.back();
@@ -302,14 +262,13 @@ fn update_step(
                 }
                 break :blk h;
             };
-            newstate.block_grid[newstate.get_index(pos)] = .{ .comparator = comp.shift(curr_in, highest_side) };
+            newstate.block_grid[i] = .{ .comparator = comp.shift(curr_in, highest_side) };
         }
     }
 
     { // For each negator, shift input
-        var block_it = State.BlockIter{};
-        while (block_it.next_pos()) |pos| {
-            const b = newstate.get_block_grid(pos);
+        for (newstate.block_grid, 0..) |b, i| {
+            const pos = newstate.get_pos(i);
             if (b != .negator) continue;
             const neg = b.negator;
             const back_dir = neg.facing.back();
@@ -337,7 +296,7 @@ fn update_step(
                     else => unreachable,
                 };
             } else 0;
-            newstate.block_grid[newstate.get_index(pos)] = .{ .negator = neg.shift(curr_in) };
+            newstate.block_grid[i] = .{ .negator = neg.shift(curr_in) };
         }
     }
     return newstate;
