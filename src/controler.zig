@@ -217,7 +217,7 @@ fn DirPosIter(comptime Int: type) type {
 }
 
 fn update(
-    newctl: *CtlState,
+    ctl: *CtlState,
     cinput: CtlInput,
     alloc: Allocator,
 ) Allocator.Error!void {
@@ -230,87 +230,87 @@ fn update(
         .step => {
             const input = .step;
             try sim.simulation.update(
-                &newctl.sim_state,
+                &ctl.sim_state,
                 input,
                 alloc,
             );
-            newctl.time_count = newctl.time_count +| 1;
+            ctl.time_count = ctl.time_count +| 1;
         },
         .putBlock => {
             const input = SimInput{ .putBlock = .{
-                .z = newctl.cursor[0],
-                .y = newctl.cursor[1],
-                .x = newctl.cursor[2],
-                .block = newctl.block_state[newctl.curr_block],
+                .z = ctl.cursor[0],
+                .y = ctl.cursor[1],
+                .x = ctl.cursor[2],
+                .block = ctl.block_state[ctl.curr_block],
             } };
             try sim.simulation.update(
-                &newctl.sim_state,
+                &ctl.sim_state,
                 input,
                 alloc,
             );
-            newctl.input_count = newctl.input_count +| 1;
-            newctl.last_input = input;
+            ctl.input_count = ctl.input_count +| 1;
+            ctl.last_input = input;
         },
-        .moveCursor => |de| if (newctl.camera.perspective_de(de)
+        .moveCursor => |de| if (ctl.camera.perspective_de(de)
             .inbounds_arr(
             u8,
-            newctl.cursor,
+            ctl.cursor,
             bounds,
         )) |npos| {
-            newctl.cursor = npos;
-            newctl.camera.mut_follow_cursor(newctl.cursor);
+            ctl.cursor = npos;
+            ctl.camera.mut_follow_cursor(ctl.cursor);
         },
-        .moveCamera => |de| newctl.camera.pos =
-            newctl.camera.perspective_de(de)
-            .add_sat_arr(isize, newctl.camera.pos),
+        .moveCamera => |de| ctl.camera.pos =
+            ctl.camera.perspective_de(de)
+            .add_sat_arr(isize, ctl.camera.pos),
         .expandCamera => |de| if (de.inbounds_arr(
             Uisize,
-            newctl.camera.dim,
+            ctl.camera.dim,
             Camera.max_dim,
         )) |_| {
             const dec_val: u1 = @intFromBool(
-                newctl.camera.perspective_de(de).is_negative(),
+                ctl.camera.perspective_de(de).is_negative(),
             );
             const i: usize = de.axis();
-            newctl.camera.pos[i] -= dec_val;
-            newctl.camera.dim[i] += 1;
+            ctl.camera.pos[i] -= dec_val;
+            ctl.camera.dim[i] += 1;
         },
         .retractCamera => |de| if (de.back().inbounds_arr(
             Uisize,
-            newctl.camera.dim,
+            ctl.camera.dim,
             Camera.max_dim,
         )) |_| {
             const inc_val: u1 = @intFromBool(
-                newctl.camera.perspective_de(de).is_negative(),
+                ctl.camera.perspective_de(de).is_negative(),
             );
             const i: usize = de.axis();
-            newctl.camera.pos[i] += inc_val;
-            newctl.camera.dim[i] -= 1;
+            ctl.camera.pos[i] += inc_val;
+            ctl.camera.dim[i] -= 1;
         },
         .flipCamera => |axis| {
-            newctl.camera.axi[@intFromEnum(axis)].is_p =
-                !newctl.camera.axi[@intFromEnum(axis)].is_p;
+            ctl.camera.axi[@intFromEnum(axis)].is_p =
+                !ctl.camera.axi[@intFromEnum(axis)].is_p;
         },
         .swapDimCamera => |axis| {
             const i = @intFromEnum(axis);
             if (i == 0) {
-                const temp = newctl.camera.axi[1];
-                newctl.camera.axi[1] = newctl.camera.axi[2];
-                newctl.camera.axi[2] = temp;
+                const temp = ctl.camera.axi[1];
+                ctl.camera.axi[1] = ctl.camera.axi[2];
+                ctl.camera.axi[2] = temp;
             } else {
-                const temp = newctl.camera.axi[0];
-                newctl.camera.axi[0] = newctl.camera.axi[i];
-                newctl.camera.axi[i] = temp;
+                const temp = ctl.camera.axi[0];
+                ctl.camera.axi[0] = ctl.camera.axi[i];
+                ctl.camera.axi[i] = temp;
             }
         },
-        .nextBlock => newctl.curr_block =
-            (newctl.curr_block +% 1) % CtlState.blks_len,
-        .prevBlock => newctl.curr_block =
-            (newctl.curr_block +% CtlState.blks_len -% 1) % CtlState.blks_len,
-        .nextRotate => newctl.block_state[newctl.curr_block] =
-            newctl.block_state[newctl.curr_block].nextRotate(),
-        .prevRotate => newctl.block_state[newctl.curr_block] =
-            newctl.block_state[newctl.curr_block].prevRotate(),
+        .nextBlock => ctl.curr_block =
+            (ctl.curr_block +% 1) % CtlState.blks_len,
+        .prevBlock => ctl.curr_block =
+            (ctl.curr_block +% CtlState.blks_len -% 1) % CtlState.blks_len,
+        .nextRotate => ctl.block_state[ctl.curr_block] =
+            ctl.block_state[ctl.curr_block].nextRotate(),
+        .prevRotate => ctl.block_state[ctl.curr_block] =
+            ctl.block_state[ctl.curr_block].prevRotate(),
     }
 }
 
