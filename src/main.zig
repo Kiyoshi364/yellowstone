@@ -57,6 +57,12 @@ fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State
     for (block_grid[0..total]) |*b| b.* = .empty;
     for (power_grid[0..total]) |*p| p.* = .empty;
 
+    state.block_grid[state.get_index(.{ 0, 0, 6 })] = .{ .wire = .{} };
+    state.block_grid[state.get_index(.{ 0, 0, 7 })] = .{
+        .repeater = block.Repeater.init(.Right, .one),
+    };
+    state.power_grid[state.get_index(.{ 0, 0, 7 })] = .repeater;
+    state.block_grid[state.get_index(.{ 0, 0, 8 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 0, 5, 0 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 0, 6, 0 })] = .{
         .repeater = block.Repeater.init(.Up, .two),
@@ -72,6 +78,10 @@ fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State
         else
             .empty;
     }
+    state.block_grid[state.get_index(.{ 1, 0, 8 })] = .{
+        .comparator = .{ .facing = .Right },
+    };
+    state.power_grid[state.get_index(.{ 1, 0, 8 })] = .comparator;
     state.block_grid[state.get_index(.{ 1, 1, 7 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 1, 1, 9 })] = .{
         .comparator = .{ .facing = .Down },
@@ -83,6 +93,7 @@ fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State
         .repeater = .{ .facing = .Up },
     };
     state.power_grid[state.get_index(.{ 1, 2, 11 })] = .repeater;
+    state.block_grid[state.get_index(.{ 1, 3, 0 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 1, 3, 2 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 1, 3, 3 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 1, 3, 4 })] = .{ .wire = .{} };
@@ -232,6 +243,7 @@ fn run(
             };
             ctlstates[i] = .{
                 .sim_state = state,
+                .cursor = .{ 1, 0, 0 },
                 .camera = .{ .pos = .{ 1, 0, 0 } },
             };
         }
