@@ -221,11 +221,7 @@ fn update(
     cinput: CtlInput,
     alloc: Allocator,
 ) Allocator.Error!void {
-    const bounds = [_]u16{
-        @intCast(sim.bounds[0]),
-        @intCast(sim.bounds[1]),
-        @intCast(sim.bounds[2]),
-    };
+    const bounds = ctl.sim_state.bounds;
     switch (cinput) {
         .step => {
             const input = .step;
@@ -407,9 +403,9 @@ pub fn draw(
 ) !void {
     const state = ctl.sim_state;
     const bounds = .{
-        sim.bounds[0],
-        sim.bounds[1],
-        sim.bounds[2],
+        state.bounds[0],
+        state.bounds[1],
+        state.bounds[2],
     };
 
     const camera = ctl.camera;
@@ -468,12 +464,19 @@ pub fn draw(
                     line_buffer[i] =
                         if (i_ib_pos.inbounds)
                     blk: {
-                        const ipos = i_ib_pos.uint_pos();
+                        const ipos = blk2: {
+                            const ipos = i_ib_pos.uint_pos();
+                            break :blk2 [_]sim.State.Upos{
+                                @intCast(ipos[0]),
+                                @intCast(ipos[1]),
+                                @intCast(ipos[2]),
+                            };
+                        };
                         const b =
                             camera.block_with_perspective(
-                            state.get_block_grid(.{ ipos[0], ipos[1], ipos[2] }),
+                            state.get_block_grid(ipos),
                         );
-                        const this_power = state.get_power_grid(.{ ipos[0], ipos[1], ipos[2] });
+                        const this_power = state.get_power_grid(ipos);
                         break :blk render_drawinfo(sim.DrawInfo.init(b, this_power));
                     } else .{
                         .top_row = "&&&".*,

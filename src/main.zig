@@ -24,7 +24,11 @@ fn serialize(
         sim.DrawInfo,
         writer,
         data.ptr,
-        sim.bounds,
+        .{
+            state.bounds[0],
+            state.bounds[1],
+            state.bounds[2],
+        },
     );
 }
 
@@ -39,23 +43,35 @@ fn deserialize(
         reader,
         alloc,
     );
-    std.debug.assert(std.meta.eql(deser.bounds, sim.bounds));
+    // TODO: alloc out_state buffers
+    std.debug.assert(deser.bounds[0] == out_state.bounds[0]);
+    std.debug.assert(deser.bounds[1] == out_state.bounds[1]);
+    std.debug.assert(deser.bounds[2] == out_state.bounds[2]);
 
     return sim.unrender_grid(deser.data, out_state);
 }
 
+const hardcoded_width = @as(sim.State.Upos, 16);
+const hardcoded_height = @as(sim.State.Upos, hardcoded_width / 2);
+const hardcoded_depth = @as(sim.State.Upos, 2);
+const hardcoded_size = hardcoded_depth * hardcoded_height * hardcoded_width;
+
 fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State {
-    const total = sim.bounds[0] * sim.bounds[1] * sim.bounds[2];
-    std.debug.assert(block_grid.len == total);
-    std.debug.assert(power_grid.len == total);
+    std.debug.assert(block_grid.len == hardcoded_size);
+    std.debug.assert(power_grid.len == hardcoded_size);
 
     const state = sim.State{
         .block_grid = block_grid,
         .power_grid = power_grid,
+        .bounds = .{
+            hardcoded_depth,
+            hardcoded_height,
+            hardcoded_width,
+        },
     };
 
-    for (block_grid[0..total]) |*b| b.* = .empty;
-    for (power_grid[0..total]) |*p| p.* = .empty;
+    for (block_grid) |*b| b.* = .empty;
+    for (power_grid) |*p| p.* = .empty;
 
     state.block_grid[state.get_index(.{ 0, 0, 6 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 0, 0, 7 })] = .{
@@ -70,7 +86,8 @@ fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State
     state.power_grid[state.get_index(.{ 0, 6, 0 })] = .repeater;
     state.block_grid[state.get_index(.{ 0, 7, 0 })] = .{ .wire = .{} };
 
-    for (0..sim.bounds[2]) |i| {
+    for (0..state.bounds[2]) |ui| {
+        const i = @as(u16, @intCast(ui));
         state.block_grid[state.get_index(.{ 1, 0, i })] = .{ .wire = .{} };
         state.block_grid[state.get_index(.{ 1, 2, i })] =
             if (i < 8)
@@ -109,7 +126,8 @@ fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State
         .negator = .{ .facing = .Above },
     };
     state.power_grid[state.get_index(.{ 1, 5, 0 })] = .negator;
-    for (0..sim.bounds[2]) |i| {
+    for (0..state.bounds[2]) |ui| {
+        const i = @as(u16, @intCast(ui));
         state.block_grid[state.get_index(.{ 1, 6, i })] = .{ .led = .{} };
     }
     state.block_grid[state.get_index(.{ 1, 6, 0 })] = .{ .block = .{} };
@@ -119,7 +137,8 @@ fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State
     };
     state.power_grid[state.get_index(.{ 1, 6, 2 })] = .comparator;
     state.block_grid[state.get_index(.{ 1, 6, 3 })] = .{ .wire = .{} };
-    for (0..sim.bounds[2]) |i| {
+    for (0..state.bounds[2]) |ui| {
+        const i = @as(u16, @intCast(ui));
         state.block_grid[state.get_index(.{ 1, 7, i })] = .{ .wire = .{} };
     }
     state.block_grid[state.get_index(.{ 1, 7, 2 })] = .{
@@ -235,10 +254,9 @@ fn run(
 
         for (0..ctlstates.len) |i| {
             const state = blk2: {
-                const len = sim.bounds[0] * sim.bounds[1] * sim.bounds[2];
-                const block_grid = try main_alloc.alloc(sim.Block, len);
+                const block_grid = try main_alloc.alloc(sim.Block, hardcoded_size);
                 errdefer main_alloc.free(block_grid);
-                const power_grid = try main_alloc.alloc(sim.Power, len);
+                const power_grid = try main_alloc.alloc(sim.Power, hardcoded_size);
                 break :blk2 initial_sim_state(block_grid, power_grid);
             };
             ctlstates[i] = .{

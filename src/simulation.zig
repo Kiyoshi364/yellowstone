@@ -17,32 +17,43 @@ pub const simulation = lib_sim.SandboxedMut(State, Input){
     .update = update,
 };
 
-pub const width = 16;
-pub const height = width / 2;
-pub const depth = 2;
-pub const bounds = [_]usize{ depth, height, width };
 pub const State = struct {
     block_grid: []Block,
     power_grid: []Power,
+    bounds: Pos,
 
-    pub const Pos = [3]usize;
+    pub const Upos = u16;
+    pub const Pos = [3]Upos;
+
+    pub fn init(
+        block_grid: []Block,
+        power_grid: []Power,
+        bounds: Pos,
+    ) State {
+        const total = bounds[0] * bounds[1] * bounds[2];
+        std.debug.assert(total <= block_grid.len);
+        std.debug.assert(total <= power_grid.len);
+        return .{
+            .block_grid = block_grid,
+            .power_grid = power_grid,
+            .bounds = bounds,
+        };
+    }
 
     pub fn get_pos(self: State, i: usize) Pos {
-        _ = self;
-        const x = i % bounds[2];
-        const y = (i / bounds[2]) % bounds[1];
-        const z = (i / bounds[2]) / bounds[1];
+        const x: Upos = @intCast(i % self.bounds[2]);
+        const y: Upos = @intCast((i / self.bounds[2]) % self.bounds[1]);
+        const z: Upos = @intCast((i / self.bounds[2]) / self.bounds[1]);
         return .{ z, y, x };
     }
 
     pub fn get_index(self: State, pos: Pos) usize {
-        _ = self;
-        std.debug.assert(pos[0] < bounds[0]);
-        std.debug.assert(pos[1] < bounds[1]);
-        std.debug.assert(pos[2] < bounds[2]);
+        std.debug.assert(pos[0] < self.bounds[0]);
+        std.debug.assert(pos[1] < self.bounds[1]);
+        std.debug.assert(pos[2] < self.bounds[2]);
 
-        const zoff = pos[0] * bounds[1] * bounds[2];
-        const yoff = pos[1] * bounds[2];
+        const zoff = pos[0] * self.bounds[1] * self.bounds[2];
+        const yoff = pos[1] * self.bounds[2];
         const xoff = pos[2];
         const index = zoff + yoff + xoff;
         return index;
@@ -63,7 +74,7 @@ test "State compiles!" {
 }
 
 pub const MachineOut = enum { old_out, new_out };
-pub const PutBlock = struct { pos: [3]u16, block: Block };
+pub const PutBlock = struct { pos: State.Pos, block: Block };
 pub const Input = union(enum) {
     step,
     putBlock: PutBlock,
@@ -100,9 +111,9 @@ fn update_step(
                 .repeater => |r| {
                     if (r.next_out() != r.last_out) {
                         if (r.facing.inbounds_arr(
-                            usize,
+                            State.Upos,
                             pos,
-                            bounds,
+                            state.bounds,
                         )) |front_pos| {
                             try mod_stack.append(front_pos);
                         } else {
@@ -115,9 +126,9 @@ fn update_step(
                 .comparator => |c| {
                     if (c.next_out() != c.last_out) {
                         if (c.facing.inbounds_arr(
-                            usize,
+                            State.Upos,
                             pos,
-                            bounds,
+                            state.bounds,
                         )) |front_pos| {
                             try mod_stack.append(front_pos);
                         } else {
@@ -132,9 +143,9 @@ fn update_step(
                         var buffer = @as([DirectionEnum.count]DirectionEnum, undefined);
                         for (n.facing.back().others(&buffer)) |d| {
                             if (d.inbounds_arr(
-                                usize,
+                                State.Upos,
                                 pos,
-                                bounds,
+                                state.bounds,
                             )) |npos| {
                                 try mod_stack.append(npos);
                             } else {
@@ -163,7 +174,7 @@ fn update_step(
             const rep = b.repeater;
             const back_dir = rep.facing.back();
             const curr_in: u1 =
-                if (back_dir.inbounds_arr(usize, pos, bounds)) |bpos|
+                if (back_dir.inbounds_arr(State.Upos, pos, state.bounds)) |bpos|
             blk: {
                 const that_power = look_at_power(
                     .new_out,
@@ -197,7 +208,7 @@ fn update_step(
             const comp = b.comparator;
             const back_dir = comp.facing.back();
             const curr_in: u4 =
-                if (back_dir.inbounds_arr(usize, pos, bounds)) |bpos|
+                if (back_dir.inbounds_arr(State.Upos, pos, state.bounds)) |bpos|
             blk: {
                 const that_power = look_at_power(
                     .new_out,
@@ -227,7 +238,7 @@ fn update_step(
                     if (std.meta.eql(de, comp.facing)) {
                         continue;
                     }
-                    if (de.inbounds_arr(usize, pos, bounds)) |bpos| {
+                    if (de.inbounds_arr(State.Upos, pos, state.bounds)) |bpos| {
                         const that_power = look_at_power(
                             .new_out,
                             de,
@@ -266,7 +277,7 @@ fn update_step(
             const neg = b.negator;
             const back_dir = neg.facing.back();
             const curr_in: u1 =
-                if (back_dir.inbounds_arr(usize, pos, bounds)) |bpos|
+                if (back_dir.inbounds_arr(State.Upos, pos, state.bounds)) |bpos|
             blk: {
                 const that_power = look_at_power(
                     .new_out,
@@ -321,7 +332,7 @@ fn update_putBlock(
             .negator => power.NEGATOR_POWER,
         };
         for (directions) |de| {
-            if (de.inbounds_arr(usize, pos, bounds)) |npos| {
+            if (de.inbounds_arr(State.Upos, pos, state.bounds)) |npos| {
                 try mod_stack.append(npos);
             }
         }
@@ -423,14 +434,14 @@ fn update_wire(
     state: *State,
     mod_stack: *Stack,
     choose_output: MachineOut,
-    pos: [3]usize,
+    pos: State.Pos,
     b: Block,
 ) Allocator.Error!void {
     std.debug.assert(b == .wire);
     var this_power = Power.empty;
     for (directions) |de| {
         std.debug.assert(0 <= @intFromEnum(this_power));
-        if (de.inbounds_arr(usize, pos, bounds)) |npos| {
+        if (de.inbounds_arr(State.Upos, pos, state.bounds)) |npos| {
             const that_block = state.get_block_grid(npos);
             const that_power = look_at_power(
                 choose_output,
@@ -478,7 +489,7 @@ fn update_wire(
     if (this_power != state.get_power_grid(pos)) {
         state.power_grid[state.get_index(pos)] = this_power;
         for (directions) |de| {
-            if (de.inbounds_arr(usize, pos, bounds)) |npos| {
+            if (de.inbounds_arr(State.Upos, pos, state.bounds)) |npos| {
                 try mod_stack.append(npos);
             }
         }
@@ -490,7 +501,7 @@ fn update_block_or_led(
     state: *State,
     mod_stack: *Stack,
     choose_output: MachineOut,
-    pos: [3]usize,
+    pos: State.Pos,
     b: Block,
 ) Allocator.Error!void {
     std.debug.assert(b == .block or b == .led);
@@ -499,7 +510,7 @@ fn update_block_or_led(
         std.debug.assert(this_power == power.BLOCK_OFF_POWER or
             this_power == power.BLOCK_ON_POWER or
             this_power == power.SOURCE_POWER);
-        if (de.inbounds_arr(usize, pos, bounds)) |npos| {
+        if (de.inbounds_arr(State.Upos, pos, state.bounds)) |npos| {
             const that_block = state.get_block_grid(npos);
             const that_power = look_at_power(
                 choose_output,
@@ -552,7 +563,7 @@ fn update_block_or_led(
     if (this_power != state.get_power_grid(pos)) {
         state.power_grid[state.get_index(pos)] = this_power;
         for (directions) |de| {
-            if (de.inbounds_arr(usize, pos, bounds)) |npos| {
+            if (de.inbounds_arr(State.Upos, pos, state.bounds)) |npos| {
                 try mod_stack.append(npos);
             }
         }
@@ -628,8 +639,8 @@ pub fn render_grid(
     state: State,
     alloc: Allocator,
 ) Allocator.Error![]DrawInfo {
-    const canvas: []DrawInfo =
-        try alloc.alloc(DrawInfo, depth * height * width);
+    const len = state.bounds[0] * state.bounds[1] * state.bounds[2];
+    const canvas: []DrawInfo = try alloc.alloc(DrawInfo, len);
     for (state.block_grid, 0..) |b, i| {
         const this_power = state.power_grid[i];
         canvas[i] = DrawInfo.init(b, this_power);
