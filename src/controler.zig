@@ -9,17 +9,18 @@ const sim = @import("simulation.zig");
 const SimState = sim.State;
 const SimInput = sim.Input;
 
+const Upos = SimState.Upos;
+const Iupos = @Type(.{ .Int = .{
+    .bits = @typeInfo(Upos).Int.bits + 1,
+    .signedness = .signed,
+} });
+
 const block = @import("block.zig");
 const Block = block.Block;
 const BlockType = block.BlockType;
 const Repeater = block.Repeater;
 
 const power = @import("power.zig");
-
-const Uisize = @Type(.{ .Int = .{
-    .bits = @typeInfo(isize).Int.bits - 1,
-    .signedness = .unsigned,
-} });
 
 pub const step_controler = update;
 
@@ -38,10 +39,10 @@ const starting_block_state = [_]Block{
 };
 
 const Camera = struct {
-    const max_dim = .{ 15, 31, 31 };
+    const max_dim = .{ 0xF, 0x1F, 0x1F };
 
-    pos: [3]isize = .{ 0, 0, 0 },
-    dim: [3]Uisize = .{ 0, 7, 15 },
+    pos: [3]Iupos = .{ 0, 0, 0 },
+    dim: [3]Upos = .{ 0, 7, 15 },
     axi: [3]struct { axis: Axis, is_p: bool } = .{
         .{ .axis = .z, .is_p = true },
         .{ .axis = .y, .is_p = true },
@@ -78,7 +79,7 @@ const Camera = struct {
             b;
     }
 
-    fn is_cursor_inside(camera: Camera, cursor: [3]u16) bool {
+    fn is_cursor_inside(camera: Camera, cursor: [3]Upos) bool {
         return for (0..3) |i| {
             if (!(camera.pos[i] <= cursor[i] and
                 cursor[i] - camera.pos[i] <= camera.dim[i]))
@@ -90,7 +91,7 @@ const Camera = struct {
 
     fn mut_follow_cursor(
         camera: *Camera,
-        cursor: [3]u16,
+        cursor: [3]Upos,
     ) void {
         if (camera.is_cursor_inside(cursor))
             void{}
@@ -99,7 +100,7 @@ const Camera = struct {
                 camera.pos[i] = cursor[i];
             } else if (camera.dim[i] < cursor[i] - camera.pos[i]) {
                 camera.pos[i] =
-                    @as(isize, cursor[i]) - camera.dim[i];
+                    @as(Iupos, cursor[i]) - camera.dim[i];
             }
         }
     }
@@ -110,7 +111,7 @@ pub const CtlState = struct {
     time_count: usize = 0,
     sim_state: SimState,
     last_input: ?SimInput = null,
-    cursor: [3]u16,
+    cursor: [3]Upos,
     camera: Camera = .{},
     block_state: @TypeOf(starting_block_state) = starting_block_state,
     curr_block: usize = 0,
@@ -243,7 +244,7 @@ fn update(
         },
         .moveCursor => |de| if (ctl.camera.perspective_de(de)
             .inbounds_arr(
-            u16,
+            Upos,
             ctl.cursor,
             bounds,
         )) |npos| {
@@ -252,9 +253,9 @@ fn update(
         },
         .moveCamera => |de| ctl.camera.pos =
             ctl.camera.perspective_de(de)
-            .add_sat_arr(isize, ctl.camera.pos),
+            .add_sat_arr(Iupos, ctl.camera.pos),
         .expandCamera => |de| if (de.inbounds_arr(
-            Uisize,
+            Upos,
             ctl.camera.dim,
             Camera.max_dim,
         )) |_| {
@@ -266,7 +267,7 @@ fn update(
             ctl.camera.dim[i] += 1;
         },
         .retractCamera => |de| if (de.back().inbounds_arr(
-            Uisize,
+            Upos,
             ctl.camera.dim,
             Camera.max_dim,
         )) |_| {
@@ -422,7 +423,7 @@ pub fn draw(
                 }
             } else pos;
         };
-        break :blk DirPosIter(isize).init(
+        break :blk DirPosIter(Iupos).init(
             camera.dir(.z),
             bounds,
             pos,
@@ -431,7 +432,7 @@ pub fn draw(
     };
 
     while (try screen_above_iter.next_ib_pos()) |k_ib_pos| {
-        var screen_down_iter = DirPosIter(isize).init(
+        var screen_down_iter = DirPosIter(Iupos).init(
             camera.dir(.y),
             bounds,
             k_ib_pos.pos,
@@ -442,13 +443,13 @@ pub fn draw(
         try print_repeat_ln(writer, "---+", .{}, line_width);
 
         while (try screen_down_iter.next_ib_pos()) |j_ib_pos| {
-            const jpos = [_]isize{
-                @as(isize, j_ib_pos.pos[0]),
-                @as(isize, j_ib_pos.pos[1]),
-                @as(isize, j_ib_pos.pos[2]),
+            const jpos = [_]Iupos{
+                j_ib_pos.pos[0],
+                j_ib_pos.pos[1],
+                j_ib_pos.pos[2],
             };
             { // build line_buffer
-                var screen_right_iter = DirPosIter(isize).init(
+                var screen_right_iter = DirPosIter(Iupos).init(
                     camera.dir(.x),
                     bounds,
                     jpos,
@@ -491,7 +492,7 @@ pub fn draw(
                 jpos[zi] == ctl.cursor[zi] and
                 jpos[yi] == ctl.cursor[yi];
             if (is_cursor_in_this_line) {
-                var screen_right_iter = DirPosIter(isize).init(
+                var screen_right_iter = DirPosIter(Iupos).init(
                     camera.dir(.x),
                     bounds,
                     jpos,
@@ -578,5 +579,5 @@ const DrawBlock = struct {
 
 test "controler compiles!" {
     std.testing.refAllDeclsRecursive(@This());
-    std.testing.refAllDeclsRecursive(DirPosIter(isize));
+    std.testing.refAllDeclsRecursive(DirPosIter(Iupos));
 }
