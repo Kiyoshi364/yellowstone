@@ -51,7 +51,7 @@ pub const CanonicalRepeater = struct {
     /// So, on the next iteration it's output
     /// will be `memory&0b0001`.
     /// And then `memory&0b0010`, ...
-    /// (Sure, assuming that `delay` is long enought).
+    /// (Sure, assuming that `delay` is long enough).
     ///
     /// The smaller the delay, more bits will be unused,
     /// which means they should be set to 0:
@@ -273,7 +273,7 @@ test "CanonicalRepeater" {
 pub const ImplicitDelayRepeater = struct {
     facing: DirectionEnum = .Up,
 
-    /// Please, look at CanonicalRepeater.memory for reference.
+    /// Please, look at `CanonicalRepeater.memory` for reference.
     /// This is the same but in a compressed form.
     ///
     /// The `delay` is encoded in the following way

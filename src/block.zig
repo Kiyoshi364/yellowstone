@@ -7,6 +7,8 @@ pub const Repeater = @import("repeater.zig").Repeater;
 pub const Comparator = @import("comparator.zig").Comparator;
 pub const Negator = @import("negator.zig").Negator;
 
+pub const CanonicalRepeater = @import("repeater.zig").CanonicalRepeater;
+
 pub const BlockType = enum(u4) {
     empty = 0,
     source,
