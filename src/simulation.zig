@@ -1,8 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const lib_sim = @import("lib_sim");
-
 const block = @import("block.zig");
 pub const Block = block.Block;
 
@@ -13,9 +11,7 @@ const directions = DirectionEnum.directions;
 const power = @import("power.zig");
 pub const Power = power.Power;
 
-pub const simulation = lib_sim.SandboxedMut(State, Input){
-    .update = update,
-};
+pub const step_simulation = update;
 
 pub const State = struct {
     grid: []Block,

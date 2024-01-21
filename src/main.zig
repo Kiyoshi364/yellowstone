@@ -1,7 +1,6 @@
 const std = @import("std");
 const isWindows = @import("builtin").os.tag == .windows;
 
-const lib_sim = @import("lib_sim");
 const lib_deser = @import("lib_deser");
 
 pub const block = @import("block.zig");
@@ -233,7 +232,7 @@ fn run(
     const stderr = bwerr.writer();
     _ = stderr;
 
-    const controler = ctl.controler;
+    const step_controler = ctl.step_controler;
 
     var ctlstates = blk: {
         var ctlstates = @as([2]ctl.CtlState, undefined);
@@ -269,7 +268,7 @@ fn run(
             break;
         };
 
-        try controler.step(&ctlstates[0], ctlinput, alloc);
+        try step_controler(&ctlstates[0], ctlinput, alloc);
         try ctl.draw(ctlstates[0], alloc, stdout);
         try bwout.flush();
 
@@ -492,12 +491,4 @@ test "It compiles!" {
     std.testing.refAllDeclsRecursive(block);
     std.testing.refAllDeclsRecursive(sim);
     std.testing.refAllDeclsRecursive(ctl);
-}
-
-test "lib_sim.counter" {
-    const counter = lib_sim.examples.counter_example;
-    const state = @as(counter.State, 1);
-    const input = .Dec;
-    const new_state = counter.sim.step(state, input);
-    try std.testing.expectEqual(@as(counter.State, 0), new_state);
 }

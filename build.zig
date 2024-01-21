@@ -12,11 +12,6 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    // Create simulation Module
-    const sim_module = b.createModule(.{
-        .source_file = .{ .path = "lib_sim/simulation.zig" },
-    });
-
     // Create (de)serialization Module
     const deser_module = b.createModule(.{
         .source_file = .{ .path = "deserializer/serializer.zig" },
@@ -28,7 +23,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    exe.addModule("lib_sim", sim_module);
     exe.addModule("lib_deser", deser_module);
 
     // This declares intent for the executable to be installed into the
@@ -46,27 +40,15 @@ pub fn build(b: *std.Build) void {
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
 
-    // Creates a step for unit testing.
-    const exe_tests_lib_sim = b.addTest(.{
-        .root_source_file = .{ .path = "lib_sim/simulation.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const test_lib_sim_step = b.step("test_lib_sim", "Run unit tests for lib_sim");
-    test_lib_sim_step.dependOn(&b.addRunArtifact(exe_tests_lib_sim).step);
-
     const exe_tests_main = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
-    exe_tests_main.addModule("lib_sim", sim_module);
     exe_tests_main.addModule("lib_deser", deser_module);
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&b.addRunArtifact(exe_tests_main).step);
-    test_step.dependOn(test_lib_sim_step);
 
     // Creates a step for docs.
     const dummy_tests_main = b.addTest(.{
@@ -74,7 +56,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    dummy_tests_main.addModule("lib_sim", sim_module);
     dummy_tests_main.addModule("lib_deser", deser_module);
 
     const main_docs = b.addInstallDirectory(.{

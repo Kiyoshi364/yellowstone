@@ -1,8 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const lib_sim = @import("lib_sim");
-
 const Direction = @import("Direction.zig");
 const DirectionEnum = Direction.DirectionEnum;
 const Axis = Direction.Axis;
@@ -23,9 +21,7 @@ const Uisize = @Type(.{ .Int = .{
     .signedness = .unsigned,
 } });
 
-pub const controler = lib_sim.SandboxedMut(CtlState, CtlInput){
-    .update = update,
-};
+pub const step_controler = update;
 
 const starting_block_state = [_]Block{
     .{ .empty = .{} },
@@ -225,7 +221,7 @@ fn update(
     switch (cinput) {
         .step => {
             const input = .step;
-            try sim.simulation.update(
+            try sim.step_simulation(
                 &ctl.sim_state,
                 input,
                 alloc,
@@ -237,7 +233,7 @@ fn update(
                 .pos = ctl.cursor,
                 .block = ctl.block_state[ctl.curr_block],
             } };
-            try sim.simulation.update(
+            try sim.step_simulation(
                 &ctl.sim_state,
                 input,
                 alloc,
