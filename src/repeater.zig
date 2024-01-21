@@ -279,7 +279,7 @@ pub const ImplicitDelayRepeater = struct {
     /// The `delay` is encoded in the following way
     /// (`x` represent `memory` bits):
     ///
-    /// - `0b0000x`: invalid
+    /// - `0b0000x`: `.one` (mirror)
     /// - `0b0001x`: `.one`
     /// - `0b001xx`: `.two`
     /// - `0b01xxx`: `.three`
@@ -335,22 +335,25 @@ pub const ImplicitDelayRepeater = struct {
     }
 
     pub fn is_valid(r: ImplicitDelayRepeater) bool {
-        return @clz(r.data) < 4;
+        _ = r;
+        return true;
     }
 
     pub fn get_delay(r: ImplicitDelayRepeater) Delay {
+        std.debug.assert(r.is_valid());
         const pack = unpack_delay_mem(r.data);
         return pack.delay;
     }
 
     pub fn get_memory(r: ImplicitDelayRepeater) u4 {
+        std.debug.assert(r.is_valid());
         const pack = unpack_delay_mem(r.data);
         return pack.mem;
     }
 
     pub fn shift(r: ImplicitDelayRepeater, curr_in: u1) ImplicitDelayRepeater {
         std.debug.assert(r.is_valid());
-        const clz = @clz(r.data);
+        const clz = @clz(@as(u3, @intCast(r.data >> 2)));
         const flip_mask = @shlExact(
             @as(u5, 0b11) ^ @as(u5, curr_in),
             3 - clz,
@@ -372,7 +375,7 @@ pub const ImplicitDelayRepeater = struct {
         return r.next_out() == 1;
     }
 
-    test "ImplicitDelayRepeater.pack and ImplicitDelayRepeater.unpack" {
+    test "ImplicitDelayRepeater: pack -> unpack" {
         const delays = [_]Delay{ .one, .two, .three, .four };
         for (delays) |delay| {
             var seq_iter = SeqIter.init(delay);
@@ -382,6 +385,23 @@ pub const ImplicitDelayRepeater = struct {
                 try std.testing.expectEqual(delay, pack.delay);
                 try std.testing.expectEqual(seq, pack.mem);
             }
+        }
+    }
+
+    test "ImplicitDelayRepeater: unpack -> pack" {
+        // Mirror
+        for (0b00..0b10) |i| {
+            const data = @as(u5, @intCast(i | 0b10));
+            const pack = unpack_delay_mem(data);
+            const data2 = pack_delay_mem(pack.delay, pack.mem);
+            try std.testing.expectEqual(data, data2);
+        }
+        // Normal
+        for (0b0_00010..0b1_00000) |i| {
+            const data = @as(u5, @intCast(i));
+            const pack = unpack_delay_mem(data);
+            const data2 = pack_delay_mem(pack.delay, pack.mem);
+            try std.testing.expectEqual(data, data2);
         }
     }
 };
