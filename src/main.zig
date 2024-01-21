@@ -56,13 +56,11 @@ const hardcoded_height = @as(sim.State.Upos, hardcoded_width / 2);
 const hardcoded_depth = @as(sim.State.Upos, 2);
 const hardcoded_size = hardcoded_depth * hardcoded_height * hardcoded_width;
 
-fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State {
+fn initial_sim_state(block_grid: []sim.Block) sim.State {
     std.debug.assert(block_grid.len == hardcoded_size);
-    std.debug.assert(power_grid.len == hardcoded_size);
 
     const state = sim.State{
         .block_grid = block_grid,
-        .power_grid = power_grid,
         .bounds = .{
             hardcoded_depth,
             hardcoded_height,
@@ -71,19 +69,16 @@ fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State
     };
 
     for (block_grid) |*b| b.* = .empty;
-    for (power_grid) |*p| p.* = .empty;
 
     state.block_grid[state.get_index(.{ 0, 0, 6 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 0, 0, 7 })] = .{
         .repeater = block.Repeater.init(.Right, .one),
     };
-    state.power_grid[state.get_index(.{ 0, 0, 7 })] = .repeater;
     state.block_grid[state.get_index(.{ 0, 0, 8 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 0, 5, 0 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 0, 6, 0 })] = .{
         .repeater = block.Repeater.init(.Up, .two),
     };
-    state.power_grid[state.get_index(.{ 0, 6, 0 })] = .repeater;
     state.block_grid[state.get_index(.{ 0, 7, 0 })] = .{ .wire = .{} };
 
     for (0..state.bounds[2]) |ui| {
@@ -98,18 +93,15 @@ fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State
     state.block_grid[state.get_index(.{ 1, 0, 8 })] = .{
         .comparator = .{ .facing = .Right },
     };
-    state.power_grid[state.get_index(.{ 1, 0, 8 })] = .comparator;
     state.block_grid[state.get_index(.{ 1, 1, 7 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 1, 1, 9 })] = .{
         .comparator = .{ .facing = .Down },
     };
-    state.power_grid[state.get_index(.{ 1, 1, 9 })] = .comparator;
     state.block_grid[state.get_index(.{ 1, 1, 11 })] = .{ .led = .{} };
     state.block_grid[state.get_index(.{ 1, 2, 9 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 1, 2, 11 })] = .{
         .repeater = .{ .facing = .Up },
     };
-    state.power_grid[state.get_index(.{ 1, 2, 11 })] = .repeater;
     state.block_grid[state.get_index(.{ 1, 3, 0 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 1, 3, 2 })] = .{ .wire = .{} };
     state.block_grid[state.get_index(.{ 1, 3, 3 })] = .{ .wire = .{} };
@@ -119,13 +111,11 @@ fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State
     state.block_grid[state.get_index(.{ 1, 3, 10 })] = .{
         .repeater = block.Repeater.init(.Right, .two),
     };
-    state.power_grid[state.get_index(.{ 1, 3, 10 })] = .repeater;
     state.block_grid[state.get_index(.{ 1, 3, 11 })] = .{ .block = .{} };
     state.block_grid[state.get_index(.{ 1, 4, 4 })] = .{ .led = .{} };
     state.block_grid[state.get_index(.{ 1, 5, 0 })] = .{
         .negator = .{ .facing = .Above },
     };
-    state.power_grid[state.get_index(.{ 1, 5, 0 })] = .negator;
     for (0..state.bounds[2]) |ui| {
         const i = @as(u16, @intCast(ui));
         state.block_grid[state.get_index(.{ 1, 6, i })] = .{ .led = .{} };
@@ -135,7 +125,6 @@ fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State
     state.block_grid[state.get_index(.{ 1, 6, 2 })] = .{
         .comparator = .{ .facing = .Right },
     };
-    state.power_grid[state.get_index(.{ 1, 6, 2 })] = .comparator;
     state.block_grid[state.get_index(.{ 1, 6, 3 })] = .{ .wire = .{} };
     for (0..state.bounds[2]) |ui| {
         const i = @as(u16, @intCast(ui));
@@ -144,7 +133,6 @@ fn initial_sim_state(block_grid: []sim.Block, power_grid: []sim.Power) sim.State
     state.block_grid[state.get_index(.{ 1, 7, 2 })] = .{
         .comparator = .{ .facing = .Left },
     };
-    state.power_grid[state.get_index(.{ 1, 7, 2 })] = .comparator;
     return state;
 }
 
@@ -177,8 +165,6 @@ fn check_serde(
 fn eq_sim_state(st1: sim.State, st2: sim.State) bool {
     return for (st1.block_grid, st2.block_grid) |b1, b2| {
         if (!std.meta.eql(b1, b2)) break false;
-    } else for (st1.power_grid, st2.power_grid) |p1, p2| {
-        if (!std.meta.eql(p1, p2)) break false;
     } else true;
 }
 
@@ -255,9 +241,7 @@ fn run(
         for (0..ctlstates.len) |i| {
             const state = blk2: {
                 const block_grid = try main_alloc.alloc(sim.Block, hardcoded_size);
-                errdefer main_alloc.free(block_grid);
-                const power_grid = try main_alloc.alloc(sim.Power, hardcoded_size);
-                break :blk2 initial_sim_state(block_grid, power_grid);
+                break :blk2 initial_sim_state(block_grid);
             };
             ctlstates[i] = .{
                 .sim_state = state,

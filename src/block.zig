@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Power = @import("power.zig").Power;
+
 const Direction = @import("Direction.zig");
 const DirectionEnum = Direction.DirectionEnum;
 
@@ -23,12 +25,25 @@ pub const BlockType = enum(u4) {
 pub const Block = union(BlockType) {
     empty: struct {},
     source: struct {},
-    wire: struct {},
-    block: struct {},
-    led: struct {},
+    wire: struct { power: Power = .empty },
+    block: struct { power: Power = .empty },
+    led: struct { power: Power = .empty },
     repeater: Repeater,
     comparator: Comparator,
     negator: Negator,
+
+    pub fn power(self: Block) Power {
+        return switch (self) {
+            .empty => .empty,
+            .source => .source,
+            .wire => |w| w.power,
+            .block => |b| b.power,
+            .led => |l| l.power,
+            .repeater => .repeater,
+            .comparator => .comparator,
+            .negator => .negator,
+        };
+    }
 
     pub fn facing(self: Block) ?DirectionEnum {
         return switch (self) {

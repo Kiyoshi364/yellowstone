@@ -19,7 +19,6 @@ pub const simulation = lib_sim.SandboxedMut(State, Input){
 
 pub const State = struct {
     block_grid: []Block,
-    power_grid: []Power,
     bounds: Pos,
 
     pub const Upos = u16;
@@ -27,15 +26,12 @@ pub const State = struct {
 
     pub fn init(
         block_grid: []Block,
-        power_grid: []Power,
         bounds: Pos,
     ) State {
         const total = bounds[0] * bounds[1] * bounds[2];
         std.debug.assert(total <= block_grid.len);
-        std.debug.assert(total <= power_grid.len);
         return .{
             .block_grid = block_grid,
-            .power_grid = power_grid,
             .bounds = bounds,
         };
     }
@@ -64,7 +60,7 @@ pub const State = struct {
     }
 
     pub fn get_power_grid(self: State, pos: Pos) Power {
-        return self.power_grid[self.get_index(pos)];
+        return self.get_block_grid(pos).power();
     }
 };
 
@@ -316,20 +312,6 @@ fn update_putBlock(
         const pos = .{ put.pos[0], put.pos[1], put.pos[2] };
         const idx = state.get_index(pos);
         state.block_grid[idx] = put.block;
-        state.power_grid[idx] = switch (put.block) {
-            .empty => power.EMPTY_POWER,
-            .source => power.SOURCE_POWER,
-            .wire,
-            .block,
-            .led,
-            => power.BLOCK_OFF_POWER,
-            .repeater => |r| blk: {
-                std.debug.assert(r.is_valid());
-                break :blk power.REPEATER_POWER;
-            },
-            .comparator => power.COMPARATOR_POWER,
-            .negator => power.NEGATOR_POWER,
-        };
         for (directions) |de| {
             if (de.inbounds_arr(State.Upos, pos, state.bounds)) |npos| {
                 try mod_stack.append(npos);
@@ -486,7 +468,7 @@ fn update_wire(
         }
     }
     if (this_power != state.get_power_grid(pos)) {
-        state.power_grid[state.get_index(pos)] = this_power;
+        state.block_grid[state.get_index(pos)].wire.power = this_power;
         for (directions) |de| {
             if (de.inbounds_arr(State.Upos, pos, state.bounds)) |npos| {
                 try mod_stack.append(npos);
@@ -560,7 +542,17 @@ fn update_block_or_led(
         }
     }
     if (this_power != state.get_power_grid(pos)) {
-        state.power_grid[state.get_index(pos)] = this_power;
+        switch (b) {
+            .block => state.block_grid[state.get_index(pos)].block.power = this_power,
+            .led => state.block_grid[state.get_index(pos)].led.power = this_power,
+            else => {
+                std.debug.print(
+                    "this: (z: {}, y: {}, x: {}) b: {}\n",
+                    .{ pos[0], pos[1], pos[2], b },
+                );
+                unreachable;
+            },
+        }
         for (directions) |de| {
             if (de.inbounds_arr(State.Upos, pos, state.bounds)) |npos| {
                 try mod_stack.append(npos);
@@ -641,8 +633,7 @@ pub fn render_grid(
     const len = state.bounds[0] * state.bounds[1] * state.bounds[2];
     const canvas: []DrawInfo = try alloc.alloc(DrawInfo, len);
     for (state.block_grid, 0..) |b, i| {
-        const this_power = state.power_grid[i];
-        canvas[i] = DrawInfo.init(b, this_power);
+        canvas[i] = DrawInfo.init(b, b.power());
     }
     return canvas;
 }
@@ -652,9 +643,7 @@ pub fn unrender_grid(
     out_state: *State,
 ) void {
     for (data_slice, 0..) |data, i| {
-        const pair = data.to_block_power();
-        out_state.block_grid[i] = pair.b;
-        out_state.power_grid[i] = pair.p;
+        out_state.block_grid[i] = data.to_block();
     }
 }
 
@@ -705,14 +694,13 @@ pub const DrawInfo = struct {
         };
     }
 
-    const Pair = struct { b: Block, p: Power };
-    pub fn to_block_power(data: DrawInfo) Pair {
-        const b = @as(Block, switch (data.block_type) {
+    pub fn to_block(data: DrawInfo) Block {
+        return switch (data.block_type) {
             .empty => .{ .empty = .{} },
             .source => .{ .source = .{} },
-            .wire => .{ .wire = .{} },
-            .block => .{ .block = .{} },
-            .led => .{ .led = .{} },
+            .wire => .{ .wire = .{ .power = @enumFromInt(data.power) } },
+            .block => .{ .block = .{ .power = @enumFromInt(data.power) } },
+            .led => .{ .led = .{ .power = @enumFromInt(data.power) } },
             .repeater => blk: {
                 const rep = block.Repeater.init_all(
                     data.dir.?,
@@ -732,21 +720,6 @@ pub const DrawInfo = struct {
                 .memory = @intCast(data.memory.?),
                 .last_out = @intCast(data.power),
             } },
-        });
-        const this_power = @as(Power, switch (data.block_type) {
-            .empty,
-            .source,
-            .wire,
-            .block,
-            .led,
-            => @enumFromInt(data.power),
-            .repeater => power.Power.repeater,
-            .comparator => power.Power.comparator,
-            .negator => power.Power.negator,
-        });
-        return .{
-            .b = b,
-            .p = this_power,
         };
     }
 };
