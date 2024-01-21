@@ -474,9 +474,9 @@ pub fn draw(
                         };
                         const b =
                             camera.block_with_perspective(
-                            state.get_block_grid(ipos),
+                            state.get_block(ipos),
                         );
-                        const this_power = state.get_power_grid(ipos);
+                        const this_power = state.get_power(ipos);
                         break :blk render_drawinfo(sim.DrawInfo.init(b, this_power));
                     } else .{
                         .top_row = "&&&".*,

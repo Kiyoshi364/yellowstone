@@ -56,11 +56,11 @@ const hardcoded_height = @as(sim.State.Upos, hardcoded_width / 2);
 const hardcoded_depth = @as(sim.State.Upos, 2);
 const hardcoded_size = hardcoded_depth * hardcoded_height * hardcoded_width;
 
-fn initial_sim_state(block_grid: []sim.Block) sim.State {
-    std.debug.assert(block_grid.len == hardcoded_size);
+fn initial_sim_state(grid: []sim.Block) sim.State {
+    std.debug.assert(grid.len == hardcoded_size);
 
     const state = sim.State{
-        .block_grid = block_grid,
+        .grid = grid,
         .bounds = .{
             hardcoded_depth,
             hardcoded_height,
@@ -68,69 +68,69 @@ fn initial_sim_state(block_grid: []sim.Block) sim.State {
         },
     };
 
-    for (block_grid) |*b| b.* = .empty;
+    for (grid) |*b| b.* = .empty;
 
-    state.block_grid[state.get_index(.{ 0, 0, 6 })] = .{ .wire = .{} };
-    state.block_grid[state.get_index(.{ 0, 0, 7 })] = .{
+    state.grid[state.get_index(.{ 0, 0, 6 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 0, 0, 7 })] = .{
         .repeater = block.Repeater.init(.Right, .one),
     };
-    state.block_grid[state.get_index(.{ 0, 0, 8 })] = .{ .wire = .{} };
-    state.block_grid[state.get_index(.{ 0, 5, 0 })] = .{ .wire = .{} };
-    state.block_grid[state.get_index(.{ 0, 6, 0 })] = .{
+    state.grid[state.get_index(.{ 0, 0, 8 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 0, 5, 0 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 0, 6, 0 })] = .{
         .repeater = block.Repeater.init(.Up, .two),
     };
-    state.block_grid[state.get_index(.{ 0, 7, 0 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 0, 7, 0 })] = .{ .wire = .{} };
 
     for (0..state.bounds[2]) |ui| {
         const i = @as(u16, @intCast(ui));
-        state.block_grid[state.get_index(.{ 1, 0, i })] = .{ .wire = .{} };
-        state.block_grid[state.get_index(.{ 1, 2, i })] =
+        state.grid[state.get_index(.{ 1, 0, i })] = .{ .wire = .{} };
+        state.grid[state.get_index(.{ 1, 2, i })] =
             if (i < 8)
             .{ .wire = .{} }
         else
             .empty;
     }
-    state.block_grid[state.get_index(.{ 1, 0, 8 })] = .{
+    state.grid[state.get_index(.{ 1, 0, 8 })] = .{
         .comparator = .{ .facing = .Right },
     };
-    state.block_grid[state.get_index(.{ 1, 1, 7 })] = .{ .wire = .{} };
-    state.block_grid[state.get_index(.{ 1, 1, 9 })] = .{
+    state.grid[state.get_index(.{ 1, 1, 7 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 1, 1, 9 })] = .{
         .comparator = .{ .facing = .Down },
     };
-    state.block_grid[state.get_index(.{ 1, 1, 11 })] = .{ .led = .{} };
-    state.block_grid[state.get_index(.{ 1, 2, 9 })] = .{ .wire = .{} };
-    state.block_grid[state.get_index(.{ 1, 2, 11 })] = .{
+    state.grid[state.get_index(.{ 1, 1, 11 })] = .{ .led = .{} };
+    state.grid[state.get_index(.{ 1, 2, 9 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 1, 2, 11 })] = .{
         .repeater = .{ .facing = .Up },
     };
-    state.block_grid[state.get_index(.{ 1, 3, 0 })] = .{ .wire = .{} };
-    state.block_grid[state.get_index(.{ 1, 3, 2 })] = .{ .wire = .{} };
-    state.block_grid[state.get_index(.{ 1, 3, 3 })] = .{ .wire = .{} };
-    state.block_grid[state.get_index(.{ 1, 3, 4 })] = .{ .wire = .{} };
-    state.block_grid[state.get_index(.{ 1, 3, 7 })] = .{ .wire = .{} };
-    state.block_grid[state.get_index(.{ 1, 3, 9 })] = .{ .wire = .{} };
-    state.block_grid[state.get_index(.{ 1, 3, 10 })] = .{
+    state.grid[state.get_index(.{ 1, 3, 0 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 1, 3, 2 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 1, 3, 3 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 1, 3, 4 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 1, 3, 7 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 1, 3, 9 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 1, 3, 10 })] = .{
         .repeater = block.Repeater.init(.Right, .two),
     };
-    state.block_grid[state.get_index(.{ 1, 3, 11 })] = .{ .block = .{} };
-    state.block_grid[state.get_index(.{ 1, 4, 4 })] = .{ .led = .{} };
-    state.block_grid[state.get_index(.{ 1, 5, 0 })] = .{
+    state.grid[state.get_index(.{ 1, 3, 11 })] = .{ .block = .{} };
+    state.grid[state.get_index(.{ 1, 4, 4 })] = .{ .led = .{} };
+    state.grid[state.get_index(.{ 1, 5, 0 })] = .{
         .negator = .{ .facing = .Above },
     };
     for (0..state.bounds[2]) |ui| {
         const i = @as(u16, @intCast(ui));
-        state.block_grid[state.get_index(.{ 1, 6, i })] = .{ .led = .{} };
+        state.grid[state.get_index(.{ 1, 6, i })] = .{ .led = .{} };
     }
-    state.block_grid[state.get_index(.{ 1, 6, 0 })] = .{ .block = .{} };
-    state.block_grid[state.get_index(.{ 1, 6, 1 })] = .{ .wire = .{} };
-    state.block_grid[state.get_index(.{ 1, 6, 2 })] = .{
+    state.grid[state.get_index(.{ 1, 6, 0 })] = .{ .block = .{} };
+    state.grid[state.get_index(.{ 1, 6, 1 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 1, 6, 2 })] = .{
         .comparator = .{ .facing = .Right },
     };
-    state.block_grid[state.get_index(.{ 1, 6, 3 })] = .{ .wire = .{} };
+    state.grid[state.get_index(.{ 1, 6, 3 })] = .{ .wire = .{} };
     for (0..state.bounds[2]) |ui| {
         const i = @as(u16, @intCast(ui));
-        state.block_grid[state.get_index(.{ 1, 7, i })] = .{ .wire = .{} };
+        state.grid[state.get_index(.{ 1, 7, i })] = .{ .wire = .{} };
     }
-    state.block_grid[state.get_index(.{ 1, 7, 2 })] = .{
+    state.grid[state.get_index(.{ 1, 7, 2 })] = .{
         .comparator = .{ .facing = .Left },
     };
     return state;
@@ -163,7 +163,7 @@ fn check_serde(
 }
 
 fn eq_sim_state(st1: sim.State, st2: sim.State) bool {
-    return for (st1.block_grid, st2.block_grid) |b1, b2| {
+    return for (st1.grid, st2.grid) |b1, b2| {
         if (!std.meta.eql(b1, b2)) break false;
     } else true;
 }
@@ -239,10 +239,10 @@ fn run(
         var ctlstates = @as([2]ctl.CtlState, undefined);
 
         for (0..ctlstates.len) |i| {
-            const state = blk2: {
-                const block_grid = try main_alloc.alloc(sim.Block, hardcoded_size);
-                break :blk2 initial_sim_state(block_grid);
-            };
+            const state =
+                initial_sim_state(
+                try main_alloc.alloc(sim.Block, hardcoded_size),
+            );
             ctlstates[i] = .{
                 .sim_state = state,
                 .cursor = .{ 1, 0, 0 },
