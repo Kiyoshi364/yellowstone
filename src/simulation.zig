@@ -70,7 +70,6 @@ pub const State = struct {
 
 test "State compiles!" {
     std.testing.refAllDeclsRecursive(State);
-    std.testing.refAllDeclsRecursive(State.BlockIter);
 }
 
 pub const MachineOut = enum { old_out, new_out };
