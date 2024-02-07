@@ -20,6 +20,8 @@ pub fn parseArgs(
     argsIter: *std.process.ArgIterator,
     error_writer: anytype,
 ) ?Command {
+    std.debug.assert(argsIter.skip());
+
     const opt_arg = argsIter.next();
 
     const cmd = if (opt_arg) |arg|

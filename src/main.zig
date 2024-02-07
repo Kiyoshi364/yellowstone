@@ -184,7 +184,6 @@ pub fn main() !void {
     const cmd = blk: { // Parse Args
         var argsIter = try std.process.argsWithAllocator(alloc);
         defer argsIter.deinit();
-        std.debug.assert(argsIter.skip());
 
         break :blk argsParser.parseArgs(
             &argsIter,
