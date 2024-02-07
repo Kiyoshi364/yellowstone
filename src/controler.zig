@@ -111,7 +111,7 @@ pub const CtlState = struct {
     time_count: usize = 0,
     sim_state: SimState,
     last_input: ?SimInput = null,
-    cursor: [3]Upos,
+    cursor: [3]Upos = .{ 0, 0, 0 },
     camera: Camera = .{},
     block_state: @TypeOf(starting_block_state) = starting_block_state,
     curr_block: usize = 0,

@@ -8,8 +8,10 @@ pub const CommandEnum = enum {
     record,
 };
 
+pub const Run = struct { filename: ?[]const u8 = null };
+
 pub const Command = union(CommandEnum) {
-    run: struct {},
+    run: Run,
     replay: struct {},
     // Testing
     @"test": struct {},
@@ -30,7 +32,10 @@ pub fn parseArgs(
                 break @unionInit(
                     Command,
                     tag.name,
-                    .{},
+                    switch (@as(CommandEnum, @enumFromInt(tag.value))) {
+                        .run => parseRun(argsIter),
+                        else => .{},
+                    },
                 );
             }
         } else {
@@ -41,10 +46,19 @@ pub fn parseArgs(
             return null;
         }
     else
-        .run;
+        Command{ .run = .{} };
 
     while (argsIter.next()) |arg| {
         std.debug.print("Ignored argument ({d}): \"{s}\"\n", .{ argsIter.inner.index - 1, arg });
     }
     return cmd;
+}
+
+fn parseRun(
+    argsIter: *std.process.ArgIterator,
+) Run {
+    const filename = argsIter.next() orelse null;
+    return .{
+        .filename = filename,
+    };
 }

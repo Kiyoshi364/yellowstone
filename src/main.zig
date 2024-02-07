@@ -45,96 +45,22 @@ fn deserialize(
         reader,
         alloc,
     );
-    // TODO: alloc out_state buffers
-    std.debug.assert(deser.bounds[0] == out_state.bounds[0]);
-    std.debug.assert(deser.bounds[1] == out_state.bounds[1]);
-    std.debug.assert(deser.bounds[2] == out_state.bounds[2]);
 
     return sim.unrender_grid(deser.data, out_state);
 }
 
-const hardcoded_width = @as(sim.State.Upos, 16);
-const hardcoded_height = @as(sim.State.Upos, hardcoded_width / 2);
-const hardcoded_depth = @as(sim.State.Upos, 2);
-const hardcoded_size = hardcoded_depth * hardcoded_height * hardcoded_width;
 
-fn initial_sim_state(grid: []sim.Block) sim.State {
-    std.debug.assert(grid.len == hardcoded_size);
-
-    const state = sim.State{
+fn init_sim_state(
+    grid: []sim.Block,
+    header: lib_deser.Header,
+    reader: anytype,
+    alloc: std.mem.Allocator,
+) !sim.State {
+    var state = .{
         .grid = grid,
-        .bounds = .{
-            hardcoded_depth,
-            hardcoded_height,
-            hardcoded_width,
-        },
+        .bounds = header.bounds,
     };
-
-    for (grid) |*b| b.* = .empty;
-
-    state.grid[state.get_index(.{ 0, 0, 6 })] = .{ .wire = .{} };
-    state.grid[state.get_index(.{ 0, 0, 7 })] = .{
-        .repeater = block.Repeater.init(.Right, .one),
-    };
-    state.grid[state.get_index(.{ 0, 0, 8 })] = .{ .wire = .{} };
-    state.grid[state.get_index(.{ 0, 5, 0 })] = .{ .wire = .{} };
-    state.grid[state.get_index(.{ 0, 6, 0 })] = .{
-        .repeater = block.Repeater.init(.Up, .two),
-    };
-    state.grid[state.get_index(.{ 0, 7, 0 })] = .{ .wire = .{} };
-
-    for (0..state.bounds[2]) |ui| {
-        const i = @as(u16, @intCast(ui));
-        state.grid[state.get_index(.{ 1, 0, i })] = .{ .wire = .{} };
-        state.grid[state.get_index(.{ 1, 2, i })] =
-            if (i < 8)
-            .{ .wire = .{} }
-        else
-            .empty;
-    }
-    state.grid[state.get_index(.{ 1, 0, 8 })] = .{
-        .comparator = .{ .facing = .Right },
-    };
-    state.grid[state.get_index(.{ 1, 1, 7 })] = .{ .wire = .{} };
-    state.grid[state.get_index(.{ 1, 1, 9 })] = .{
-        .comparator = .{ .facing = .Down },
-    };
-    state.grid[state.get_index(.{ 1, 1, 11 })] = .{ .led = .{} };
-    state.grid[state.get_index(.{ 1, 2, 9 })] = .{ .wire = .{} };
-    state.grid[state.get_index(.{ 1, 2, 11 })] = .{
-        .repeater = .{ .facing = .Up },
-    };
-    state.grid[state.get_index(.{ 1, 3, 0 })] = .{ .wire = .{} };
-    state.grid[state.get_index(.{ 1, 3, 2 })] = .{ .wire = .{} };
-    state.grid[state.get_index(.{ 1, 3, 3 })] = .{ .wire = .{} };
-    state.grid[state.get_index(.{ 1, 3, 4 })] = .{ .wire = .{} };
-    state.grid[state.get_index(.{ 1, 3, 7 })] = .{ .wire = .{} };
-    state.grid[state.get_index(.{ 1, 3, 9 })] = .{ .wire = .{} };
-    state.grid[state.get_index(.{ 1, 3, 10 })] = .{
-        .repeater = block.Repeater.init(.Right, .two),
-    };
-    state.grid[state.get_index(.{ 1, 3, 11 })] = .{ .block = .{} };
-    state.grid[state.get_index(.{ 1, 4, 4 })] = .{ .led = .{} };
-    state.grid[state.get_index(.{ 1, 5, 0 })] = .{
-        .negator = .{ .facing = .Above },
-    };
-    for (0..state.bounds[2]) |ui| {
-        const i = @as(u16, @intCast(ui));
-        state.grid[state.get_index(.{ 1, 6, i })] = .{ .led = .{} };
-    }
-    state.grid[state.get_index(.{ 1, 6, 0 })] = .{ .block = .{} };
-    state.grid[state.get_index(.{ 1, 6, 1 })] = .{ .wire = .{} };
-    state.grid[state.get_index(.{ 1, 6, 2 })] = .{
-        .comparator = .{ .facing = .Right },
-    };
-    state.grid[state.get_index(.{ 1, 6, 3 })] = .{ .wire = .{} };
-    for (0..state.bounds[2]) |ui| {
-        const i = @as(u16, @intCast(ui));
-        state.grid[state.get_index(.{ 1, 7, i })] = .{ .wire = .{} };
-    }
-    state.grid[state.get_index(.{ 1, 7, 2 })] = .{
-        .comparator = .{ .facing = .Left },
-    };
+    try deserialize(@TypeOf(reader), &state, header, reader, alloc);
     return state;
 }
 
@@ -194,8 +120,9 @@ pub fn main() !void {
     };
 
     return switch (cmd) {
-        .run => run(
+        .run => |inputs| run(
             &arena,
+            inputs,
             stdin_file,
             stdout_file,
             stderr_file,
@@ -219,6 +146,7 @@ fn command_not_implemented(
 
 fn run(
     main_arena: *std.heap.ArenaAllocator,
+    inputs: argsParser.Run,
     stdin_file: anytype,
     stdout_file: anytype,
     stderr_file: anytype,
@@ -231,24 +159,49 @@ fn run(
     var bwout = std.io.bufferedWriter(stdout_file);
     const stdout = bwout.writer();
 
-    var bwerr = std.io.bufferedWriter(stderr_file);
-    const stderr = bwerr.writer();
-    _ = stderr;
-
     const step_controler = ctl.step_controler;
 
     var ctlstates = blk: {
+        var deinit_buffer = false;
+        const initial_buffer = if (inputs.filename) |input_filename| blk2: {
+            try stderr_file.print("Initializing with file: \"{s}\"\n", .{input_filename});
+            const file = try std.fs.cwd().openFile(input_filename, .{});
+            defer file.close();
+
+            const max_bytes = 4096;
+            deinit_buffer = true;
+            break :blk2 file.readToEndAlloc(main_alloc, max_bytes) catch |err| switch (err) {
+                error.FileTooBig => blk3: {
+                    try stderr_file.print(
+                        "File is too big (supported size {d} bytes); Using default state instead\n",
+                        .{max_bytes},
+                    );
+                    deinit_buffer = false;
+                    break :blk3 @embedFile("init_state.ys.txt");
+                },
+                else => return err,
+            };
+        } else blk2: {
+            try stderr_file.print("Initializing with default state\n", .{});
+            break :blk2 @embedFile("init_state.ys.txt");
+        };
+        defer if (deinit_buffer) main_alloc.free(initial_buffer) else {};
+
+        var buf_stream = std.io.fixedBufferStream(initial_buffer);
+        const sr = buf_stream.reader();
+
+        const header = try lib_deser.read_header(sr);
+        const after_header = try buf_stream.getPos();
+
         var ctlstates = @as([2]ctl.CtlState, undefined);
 
         for (0..ctlstates.len) |i| {
-            const state =
-                initial_sim_state(
-                try main_alloc.alloc(sim.Block, hardcoded_size),
-            );
+            try buf_stream.seekTo(after_header);
+
+            const grid = try main_alloc.alloc(sim.Block, header.bounds[0] * header.bounds[1] * header.bounds[2]);
+            const state = try init_sim_state(grid, header, sr, main_alloc);
             ctlstates[i] = .{
                 .sim_state = state,
-                .cursor = .{ 1, 0, 0 },
-                .camera = .{ .pos = .{ 1, 0, 0 } },
             };
         }
         break :blk ctlstates;

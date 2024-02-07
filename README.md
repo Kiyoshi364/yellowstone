@@ -9,6 +9,8 @@ Note that `---` are optmized for [slides](https://github.com/maaslalani/slides)
 
 # How to run
 
+## Quick Start
+
 * Run:
   ```console
   zig build run
@@ -37,6 +39,23 @@ $ zig version
 ```
 
 See: ([downloads page](https:ziglang.org/download))
+
+---
+
+# Commands
+
+## Run
+
+Usage: `yellowstone run [initial_state_file]`.
+
+> **Note**: To pass arguments to `run` command
+> using `zig build run`
+> use `zig build run -- run <args>`.
+> For example:
+> `zig build run -- run mystate.ys.txt`
+
+When the program exits,
+it writes the simulation state in `dump_state.ys.txt`.
 
 ---
 # Using the Simulation

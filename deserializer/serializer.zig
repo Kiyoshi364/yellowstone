@@ -333,7 +333,6 @@ pub fn serialize(
 pub fn Deser(comptime Data: type) type {
     return struct {
         data: []Data,
-        bounds: [3]Ubounds,
     };
 }
 
@@ -381,6 +380,5 @@ pub fn deserialize(
 
     return Deser(Data){
         .data = data,
-        .bounds = bounds,
     };
 }
