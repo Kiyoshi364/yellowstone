@@ -43,9 +43,8 @@ pub fn parseArgs(
     else
         .run;
 
-    var i = @as(usize, 2);
-    while (argsIter.next()) |arg| : (i += 1) {
-        std.debug.print("Ignored argument ({d}): \"{s}\"\n", .{ i, arg });
+    while (argsIter.next()) |arg| {
+        std.debug.print("Ignored argument ({d}): \"{s}\"\n", .{ argsIter.inner.index - 1, arg });
     }
     return cmd;
 }
