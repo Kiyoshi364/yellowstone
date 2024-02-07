@@ -30,8 +30,8 @@ fn str_sep(sep: Separator) []const u8 {
     };
 }
 
-fn parse_hex(buf: []const u8) !usize {
-    var acc = @as(usize, 0);
+fn parse_hex(comptime Uint: type, buf: []const u8) !Uint {
+    var acc = @as(Uint, 0);
     for (buf) |c| {
         if ('0' <= c and c <= '9') {
             acc = (acc * 16) + c - '0';
@@ -62,9 +62,15 @@ fn read_exact(
     }
 }
 
-fn read_header(
+const Ubounds = u16;
+
+pub const Header = struct {
+    bounds: [3]Ubounds,
+};
+
+pub fn read_header(
     reader: anytype,
-) ![3]usize {
+) !Header {
     try read_exact("v1\n", reader);
 
     var read = @as(usize, undefined);
@@ -93,15 +99,18 @@ fn read_header(
 
     try read_exact("\n", reader);
 
-    return .{
-        try parse_hex(&bz),
-        try parse_hex(&by),
-        try parse_hex(&bx),
+    const bounds = .{
+        try parse_hex(Ubounds, &bz),
+        try parse_hex(Ubounds, &by),
+        try parse_hex(Ubounds, &bx),
+    };
+    return Header{
+        .bounds = bounds,
     };
 }
 
-fn print_header(
-    bounds: [3]usize,
+pub fn print_header(
+    bounds: [3]Ubounds,
     writer: anytype,
 ) !void {
     try writer.print(
@@ -288,9 +297,8 @@ pub fn serialize(
     comptime Data: type,
     writer: anytype,
     data: [*]const Data,
-    bounds: [3]usize,
+    bounds: [3]Ubounds,
 ) !void {
-    try print_header(bounds, writer);
     var i = @as(usize, 0);
     try print_sep(.start_z, writer);
     while (i < bounds[0]) : (i += 1) {
@@ -325,16 +333,17 @@ pub fn serialize(
 pub fn Deser(comptime Data: type) type {
     return struct {
         data: []Data,
-        bounds: [3]usize,
+        bounds: [3]Ubounds,
     };
 }
 
 pub fn deserialize(
     comptime Data: type,
+    header: Header,
     reader: anytype,
     alloc: std.mem.Allocator,
 ) !Deser(Data) {
-    const bounds = try read_header(reader);
+    const bounds = header.bounds;
 
     const data = try alloc.alloc(
         Data,

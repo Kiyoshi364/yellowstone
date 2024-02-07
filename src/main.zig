@@ -19,6 +19,7 @@ fn serialize(
 ) !void {
     const data = try sim.render_grid(state, alloc);
 
+    try lib_deser.print_header(state.bounds, writer);
     try lib_deser.serialize(
         sim.DrawInfo,
         writer,
@@ -34,11 +35,13 @@ fn serialize(
 fn deserialize(
     comptime Reader: type,
     out_state: *sim.State,
+    header: lib_deser.Header,
     reader: Reader,
     alloc: std.mem.Allocator,
 ) !void {
     const deser = try lib_deser.deserialize(
         sim.DrawInfo,
+        header,
         reader,
         alloc,
     );
@@ -153,7 +156,8 @@ fn check_serde(
     );
     const sr = buf_stream2.reader();
 
-    try deserialize(@TypeOf(sr), temp_sim_state, sr, alloc);
+    const header = try lib_deser.read_header(sr);
+    try deserialize(@TypeOf(sr), temp_sim_state, header, sr, alloc);
 
     return if (eq_sim_state(sim_state, temp_sim_state.*))
         void{}
