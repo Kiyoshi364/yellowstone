@@ -598,11 +598,11 @@ pub fn render_grid(
 }
 
 pub fn unrender_grid(
-    data_slice: []DrawInfo,
-    out_state: *State,
+    data_slice: []const DrawInfo,
+    grid: []Block,
 ) void {
     for (data_slice, 0..) |data, i| {
-        out_state.grid[i] = data.to_block();
+        grid[i] = data.to_block();
     }
 }
 

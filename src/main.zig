@@ -34,11 +34,13 @@ fn serialize(
 
 fn deserialize(
     comptime Reader: type,
-    out_state: *sim.State,
+    out_grid: []sim.Block,
     header: lib_deser.Header,
     reader: Reader,
     alloc: std.mem.Allocator,
-) !void {
+) !sim.State {
+    const grid_len = header.bounds[0] * header.bounds[1] * header.bounds[2];
+    std.debug.assert(out_grid.len == grid_len);
     const deser = try lib_deser.deserialize(
         sim.DrawInfo,
         header,
@@ -46,7 +48,11 @@ fn deserialize(
         alloc,
     );
 
-    return sim.unrender_grid(deser.data, out_state);
+    sim.unrender_grid(deser.data, out_grid);
+    return sim.State{
+        .grid = out_grid,
+        .bounds = header.bounds,
+    };
 }
 
 const default_state = struct {
@@ -74,11 +80,7 @@ const default_state = struct {
             &data,
         ) catch unreachable;
 
-        var state = sim.State{
-            .grid = &grid,
-            .bounds = header.bounds,
-        };
-        sim.unrender_grid(deser.data, &state);
+        sim.unrender_grid(deser.data, &grid);
 
         break :blk @This(){
             .grid = &grid,
@@ -88,22 +90,17 @@ const default_state = struct {
 }.default;
 
 fn init_sim_state(
-    grid: []sim.Block,
+    out_grid: []sim.Block,
     header: lib_deser.Header,
     reader: anytype,
     alloc: std.mem.Allocator,
 ) !sim.State {
-    var state = .{
-        .grid = grid,
-        .bounds = header.bounds,
-    };
-    try deserialize(@TypeOf(reader), &state, header, reader, alloc);
-    return state;
+    return try deserialize(@TypeOf(reader), out_grid, header, reader, alloc);
 }
 
 fn check_serde(
     sim_state: sim.State,
-    temp_sim_state: *sim.State,
+    temp_grid: []sim.Block,
     alloc: std.mem.Allocator,
 ) !void {
     const buffer = try alloc.alloc(u8, 2000);
@@ -120,9 +117,9 @@ fn check_serde(
     const sr = buf_stream2.reader();
 
     const header = try lib_deser.read_header(sr);
-    try deserialize(@TypeOf(sr), temp_sim_state, header, sr, alloc);
+    const temp_sim_state = try deserialize(@TypeOf(sr), temp_grid, header, sr, alloc);
 
-    return if (eq_sim_state(sim_state, temp_sim_state.*))
+    return if (eq_sim_state(sim_state, temp_sim_state))
         void{}
     else
         error.SerdeFailed;
@@ -280,7 +277,7 @@ fn run(
         try ctl.draw(ctlstates[0], alloc, stdout);
         try bwout.flush();
 
-        try check_serde(ctlstates[0].sim_state, &ctlstates[1].sim_state, alloc);
+        try check_serde(ctlstates[0].sim_state, ctlstates[1].sim_state.grid, alloc);
 
         std.debug.assert(arena.reset(.{ .free_all = {} }));
     }
