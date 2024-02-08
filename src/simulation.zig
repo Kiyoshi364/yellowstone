@@ -606,18 +606,42 @@ pub fn unrender_grid(
     }
 }
 
-pub const DrawInfo = struct {
+// Note: it is packed to be able to run at comptime
+pub const DrawInfo = packed struct {
     pub const PowerUint = power.PowerUint;
     pub const BlockType = block.BlockType;
     pub const DirectionEnum = Direction.DirectionEnum;
+    pub const ValidFields = enum(u3) {
+        none = 0x0,
+        memory = 0x1,
+        info = 0x2,
+        dir = 0x4,
+        all = 0x7,
+        _,
+
+        pub fn has(self: ValidFields, other: ValidFields) bool {
+            return @intFromEnum(self) & @intFromEnum(other) ==
+                @intFromEnum(other);
+        }
+
+        pub fn with(self: ValidFields, other: ValidFields) ValidFields {
+            return @enumFromInt(@intFromEnum(self) | @intFromEnum(other));
+        }
+
+        pub fn without(self: ValidFields, other: ValidFields) ValidFields {
+            return @enumFromInt(@intFromEnum(self) & ~@intFromEnum(other));
+        }
+    };
 
     power: DrawInfo.PowerUint,
     block_type: DrawInfo.BlockType,
-    memory: ?u4,
-    info: ?u2,
-    dir: ?DrawInfo.DirectionEnum,
+    memory: u4,
+    info: u2,
+    dir: DrawInfo.DirectionEnum,
+    valid_fields: ValidFields,
 
     pub fn init(b: Block, this_power: Power) DrawInfo {
+        var valid_fields = ValidFields.all;
         const pwr = switch (this_power) {
             .empty, .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .ten, .eleven, .twelve, .thirteen, .fourteen, .fifteen, .source => this_power.to_index(),
             .repeater => blk: {
@@ -635,21 +659,33 @@ pub const DrawInfo = struct {
             _ => unreachable,
         };
         const memory = switch (b) {
-            .empty, .source, .wire, .block, .led => null,
+            .empty, .source, .wire, .block, .led => blk: {
+                valid_fields = valid_fields.without(.memory);
+                break :blk 0;
+            },
             .repeater => |r| r.get_memory(),
             .comparator => |c| c.memory,
             .negator => |n| n.memory,
         };
         const info = switch (b) {
-            .empty, .source, .wire, .block, .led, .comparator, .negator => null,
+            .empty, .source, .wire, .block, .led, .comparator, .negator => blk: {
+                valid_fields = valid_fields.without(.info);
+                break :blk 0;
+            },
             .repeater => |r| @intFromEnum(r.get_delay()),
+        };
+
+        const dir = if (b.facing()) |de| de else blk: {
+            valid_fields = valid_fields.without(.dir);
+            break :blk .Above;
         };
         return DrawInfo{
             .power = pwr,
             .block_type = @as(BlockType, b),
             .memory = memory,
             .info = info,
-            .dir = b.facing(),
+            .dir = dir,
+            .valid_fields = valid_fields,
         };
     }
 
@@ -661,24 +697,34 @@ pub const DrawInfo = struct {
             .block => .{ .block = .{ .power = @enumFromInt(data.power) } },
             .led => .{ .led = .{ .power = @enumFromInt(data.power) } },
             .repeater => blk: {
+                std.debug.assert(@intFromEnum(data.valid_fields) ==
+                    @intFromEnum(ValidFields.all));
                 const rep = block.Repeater.init_all(
-                    data.dir.?,
-                    @enumFromInt(data.info.?),
-                    @intCast(data.memory.?),
+                    data.dir,
+                    @enumFromInt(data.info),
+                    @intCast(data.memory),
                     @intCast(data.power),
                 );
                 break :blk .{ .repeater = rep };
             },
-            .comparator => .{ .comparator = .{
-                .facing = data.dir.?,
-                .memory = data.memory.?,
-                .last_out = @intCast(data.power),
-            } },
-            .negator => .{ .negator = .{
-                .facing = data.dir.?,
-                .memory = @intCast(data.memory.?),
-                .last_out = @intCast(data.power),
-            } },
+            .comparator => blk: {
+                std.debug.assert(@intFromEnum(data.valid_fields) ==
+                    (@intFromEnum(ValidFields.all) ^ @intFromEnum(ValidFields.info)));
+                break :blk .{ .comparator = .{
+                    .facing = data.dir,
+                    .memory = data.memory,
+                    .last_out = @intCast(data.power),
+                } };
+            },
+            .negator => blk: {
+                std.debug.assert(@intFromEnum(data.valid_fields) ==
+                    (@intFromEnum(ValidFields.all) ^ @intFromEnum(ValidFields.info)));
+                break :blk .{ .negator = .{
+                    .facing = data.dir,
+                    .memory = @intCast(data.memory),
+                    .last_out = @intCast(data.power),
+                } };
+            },
         };
     }
 };

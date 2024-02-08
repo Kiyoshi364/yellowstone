@@ -155,6 +155,8 @@ fn read_data(
         return error.InputTruncated;
     }
 
+    var valid_fields = Data.ValidFields.all;
+
     const block_type = @as(
         Data.BlockType,
         switch (buffer[0]) {
@@ -195,7 +197,7 @@ fn read_data(
     );
 
     const dir = @as(
-        ?Data.DirectionEnum,
+        Data.DirectionEnum,
         switch (buffer[2]) {
             'o' => .Above,
             '^' => .Up,
@@ -203,25 +205,31 @@ fn read_data(
             'v' => .Down,
             '<' => .Left,
             'x' => .Below,
-            '-' => null,
+            '-' => blk: {
+                valid_fields = valid_fields.without(Data.ValidFields.dir);
+                break :blk .Above;
+            },
             else => return error.InvalidDirection,
         },
     );
 
     const info = @as(
-        ?u2,
+        u2,
         switch (buffer[4]) {
             '1' => 0,
             '2' => 1,
             '3' => 2,
             '4' => 3,
-            '-' => null,
+            '-' => blk: {
+                valid_fields = valid_fields.without(Data.ValidFields.info);
+                break :blk 0;
+            },
             else => return error.InvalidInfo,
         },
     );
 
     const memory = @as(
-        ?u4,
+        u4,
         switch (buffer[3]) {
             '0' => 0,
             '1' => 1,
@@ -239,7 +247,10 @@ fn read_data(
             'd' => 13,
             'e' => 14,
             'f' => 15,
-            '-' => null,
+            '-' => blk: {
+                valid_fields = valid_fields.without(Data.ValidFields.memory);
+                break :blk 0;
+            },
             else => return error.InvalidMemory,
         },
     );
@@ -250,6 +261,7 @@ fn read_data(
         .memory = memory,
         .info = info,
         .dir = dir,
+        .valid_fields = valid_fields,
     };
 }
 
@@ -269,16 +281,16 @@ fn print_data(
         .comparator => @as(u8, 'c'),
         .negator => @as(u8, 'n'),
     };
-    const c_mem = if (info.memory) |m|
-        char_powers[m]
+    const c_mem = if (info.valid_fields.has(.memory))
+        char_powers[info.memory]
     else
         @as(u8, '-');
-    const c_dir = if (info.dir) |de|
-        char_dirs[@intFromEnum(de)]
+    const c_dir = if (info.valid_fields.has(.dir))
+        char_dirs[@intFromEnum(info.dir)]
     else
         @as(u8, '-');
-    const c_info = if (info.info) |i|
-        char_delays[i]
+    const c_info = if (info.valid_fields.has(.info))
+        char_delays[info.info]
     else
         @as(u8, '-');
     try writer.print(
@@ -336,18 +348,13 @@ pub fn Deser(comptime Data: type) type {
     };
 }
 
-pub fn deserialize(
+pub fn deserialize_alloced(
     comptime Data: type,
     header: Header,
     reader: anytype,
-    alloc: std.mem.Allocator,
+    data: []Data,
 ) !Deser(Data) {
     const bounds = header.bounds;
-
-    const data = try alloc.alloc(
-        Data,
-        bounds[0] * bounds[1] * bounds[2],
-    );
 
     var i = @as(usize, 0);
     try read_sep(.start_z, reader);
@@ -381,4 +388,19 @@ pub fn deserialize(
     return Deser(Data){
         .data = data,
     };
+}
+
+pub fn deserialize(
+    comptime Data: type,
+    header: Header,
+    reader: anytype,
+    alloc: std.mem.Allocator,
+) !Deser(Data) {
+    const bounds = header.bounds;
+
+    const data = try alloc.alloc(
+        Data,
+        bounds[0] * bounds[1] * bounds[2],
+    );
+    return deserialize_alloced(Data, header, reader, data);
 }

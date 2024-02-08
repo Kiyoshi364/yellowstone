@@ -346,12 +346,17 @@ fn default_render_drawinfo(info: sim.DrawInfo) DrawBlock {
         .comparator => @as(u8, 'c'),
         .negator => @as(u8, 'n'),
     };
-    const c_mem = char_powers[info.memory orelse 0];
-    const c_info = if (info.info) |i| "1234"[i] else ' ';
+    const c_mem = char_powers[
+        if (info.valid_fields.has(.memory))
+            info.memory
+        else
+            0
+    ];
+    const c_info = if (info.valid_fields.has(.info)) "1234"[info.info] else ' ';
     const char_dirs = @as(*const [6]u8, "o^>v<x");
     var c_dirs = @as([5]u8, "     ".*);
-    if (info.dir) |facing| {
-        const i = @intFromEnum(facing);
+    if (info.valid_fields.has(.dir)) {
+        const i = @intFromEnum(info.dir);
         c_dirs[i % c_dirs.len] = char_dirs[i];
     } else {
         // Empty
