@@ -49,6 +49,43 @@ fn deserialize(
     return sim.unrender_grid(deser.data, out_state);
 }
 
+const default_state = struct {
+    grid: []sim.Block,
+    bounds: sim.State.Pos,
+
+    const grid_len = 2 * 8 * 16;
+    const default = blk: {
+        var grid = @as([grid_len]sim.Block, undefined);
+
+        const initial_buffer = @embedFile("init_state.ys.txt");
+
+        var buf_stream = std.io.fixedBufferStream(initial_buffer);
+        const sr = buf_stream.reader();
+
+        const header = lib_deser.read_header(sr) catch unreachable;
+
+        var data = @as([grid_len]sim.DrawInfo, undefined);
+
+        @setEvalBranchQuota(0x183A);
+        const deser = lib_deser.deserialize_alloced(
+            sim.DrawInfo,
+            header,
+            sr,
+            &data,
+        ) catch unreachable;
+
+        var state = sim.State{
+            .grid = &grid,
+            .bounds = header.bounds,
+        };
+        sim.unrender_grid(deser.data, &state);
+
+        break :blk @This(){
+            .grid = &grid,
+            .bounds = header.bounds,
+        };
+    };
+}.default;
 
 fn init_sim_state(
     grid: []sim.Block,
@@ -162,44 +199,59 @@ fn run(
     const step_controler = ctl.step_controler;
 
     var ctlstates = blk: {
-        var deinit_buffer = false;
-        const initial_buffer = if (inputs.filename) |input_filename| blk2: {
+        var ctlstates = @as([2]ctl.CtlState, undefined);
+
+        if (inputs.filename) |input_filename| blk2: {
             try stderr_file.print("Initializing with file: \"{s}\"\n", .{input_filename});
             const file = try std.fs.cwd().openFile(input_filename, .{});
             defer file.close();
 
             const max_bytes = 4096;
-            deinit_buffer = true;
-            break :blk2 file.readToEndAlloc(main_alloc, max_bytes) catch |err| switch (err) {
-                error.FileTooBig => blk3: {
+            const file_buffer = file.readToEndAlloc(main_alloc, max_bytes) catch |err| switch (err) {
+                error.FileTooBig => {
                     try stderr_file.print(
                         "File is too big (supported size {d} bytes); Using default state instead\n",
                         .{max_bytes},
                     );
-                    deinit_buffer = false;
-                    break :blk3 @embedFile("init_state.ys.txt");
+                    break :blk2;
                 },
                 else => return err,
             };
-        } else blk2: {
-            try stderr_file.print("Initializing with default state\n", .{});
-            break :blk2 @embedFile("init_state.ys.txt");
-        };
-        defer if (deinit_buffer) main_alloc.free(initial_buffer) else {};
+            defer main_alloc.free(file_buffer);
 
-        var buf_stream = std.io.fixedBufferStream(initial_buffer);
-        const sr = buf_stream.reader();
+            var buf_stream = std.io.fixedBufferStream(file_buffer);
+            const sr = buf_stream.reader();
 
-        const header = try lib_deser.read_header(sr);
-        const after_header = try buf_stream.getPos();
+            const header = try lib_deser.read_header(sr);
+            const after_header = try buf_stream.getPos();
 
-        var ctlstates = @as([2]ctl.CtlState, undefined);
+            const grid_len = header.bounds[0] * header.bounds[1] * header.bounds[2];
+            const grids = try main_alloc.alloc(sim.Block, ctlstates.len * grid_len);
+
+            for (0..ctlstates.len) |i| {
+                try buf_stream.seekTo(after_header);
+
+                const state = try init_sim_state(grids[i * grid_len .. (i + 1) * grid_len], header, sr, main_alloc);
+                ctlstates[i] = .{
+                    .sim_state = state,
+                };
+            }
+
+            break :blk ctlstates;
+        }
+
+        try stderr_file.print("Initializing with default state\n", .{});
+
+        const grid_len = default_state.grid.len;
+        const grids = try main_alloc.alloc(sim.Block, ctlstates.len * grid_len);
 
         for (0..ctlstates.len) |i| {
-            try buf_stream.seekTo(after_header);
-
-            const grid = try main_alloc.alloc(sim.Block, header.bounds[0] * header.bounds[1] * header.bounds[2]);
-            const state = try init_sim_state(grid, header, sr, main_alloc);
+            const grid = grids[i * grid_len .. (i + 1) * grid_len];
+            std.mem.copy(sim.Block, grid, default_state.grid);
+            const state = .{
+                .grid = grid,
+                .bounds = default_state.bounds,
+            };
             ctlstates[i] = .{
                 .sim_state = state,
             };
