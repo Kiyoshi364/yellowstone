@@ -12,9 +12,8 @@ const argsParser = @import("argsParser.zig");
 var global_term: ?Term = null;
 
 fn serialize(
-    comptime Writer: type,
     state: sim.State,
-    writer: Writer,
+    writer: anytype,
     alloc: std.mem.Allocator,
 ) !void {
     const data = try sim.render_grid(state, alloc);
@@ -33,10 +32,9 @@ fn serialize(
 }
 
 fn deserialize(
-    comptime Reader: type,
     out_grid: []sim.Block,
     header: lib_deser.Header,
-    reader: Reader,
+    reader: anytype,
     alloc: std.mem.Allocator,
 ) !sim.State {
     const grid_len = header.bounds[0] * header.bounds[1] * header.bounds[2];
@@ -89,15 +87,6 @@ const default_state = struct {
     };
 }.default;
 
-fn init_sim_state(
-    out_grid: []sim.Block,
-    header: lib_deser.Header,
-    reader: anytype,
-    alloc: std.mem.Allocator,
-) !sim.State {
-    return try deserialize(@TypeOf(reader), out_grid, header, reader, alloc);
-}
-
 fn check_serde(
     sim_state: sim.State,
     temp_grid: []sim.Block,
@@ -109,7 +98,7 @@ fn check_serde(
 
     const sw = buf_stream.writer();
 
-    try serialize(@TypeOf(sw), sim_state, sw, alloc);
+    try serialize(sim_state, sw, alloc);
 
     var buf_stream2 = std.io.fixedBufferStream(
         buf_stream.getWritten(),
@@ -117,7 +106,7 @@ fn check_serde(
     const sr = buf_stream2.reader();
 
     const header = try lib_deser.read_header(sr);
-    const temp_sim_state = try deserialize(@TypeOf(sr), temp_grid, header, sr, alloc);
+    const temp_sim_state = try deserialize(temp_grid, header, sr, alloc);
 
     return if (eq_sim_state(sim_state, temp_sim_state))
         void{}
@@ -228,7 +217,7 @@ fn run(
             for (0..ctlstates.len) |i| {
                 try buf_stream.seekTo(after_header);
 
-                const state = try init_sim_state(grids[i * grid_len .. (i + 1) * grid_len], header, sr, main_alloc);
+                const state = try deserialize(grids[i * grid_len .. (i + 1) * grid_len], header, sr, main_alloc);
                 ctlstates[i] = .{
                     .sim_state = state,
                 };
@@ -289,7 +278,7 @@ fn run(
 
         const fw = file.writer();
 
-        try serialize(@TypeOf(fw), ctlstates[0].sim_state, fw, alloc);
+        try serialize(ctlstates[0].sim_state, fw, alloc);
     }
 }
 
