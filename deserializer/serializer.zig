@@ -305,6 +305,15 @@ fn print_data(
     );
 }
 
+pub fn encoding_size(data_len: usize, z_bounds: usize) usize {
+    const header_size = 18;
+    const item_size = 6;
+
+    return header_size +
+        item_size * data_len +
+        z_bounds - 1;
+}
+
 pub fn serialize(
     comptime Data: type,
     writer: anytype,

@@ -92,7 +92,12 @@ fn check_serde(
     temp_grid: []sim.Block,
     alloc: std.mem.Allocator,
 ) !void {
-    const buffer = try alloc.alloc(u8, 2000);
+    const buffer_size = lib_deser.encoding_size(
+        sim_state.grid_len(),
+        sim_state.bounds[0],
+    );
+
+    const buffer = try alloc.alloc(u8, buffer_size);
     defer alloc.free(buffer);
     var buf_stream = std.io.fixedBufferStream(buffer);
 
@@ -192,7 +197,7 @@ fn run(
             const file = try std.fs.cwd().openFile(input_filename, .{});
             defer file.close();
 
-            const max_bytes = 4096;
+            const max_bytes = 32 * 1024;
             const file_buffer = file.readToEndAlloc(main_alloc, max_bytes) catch |err| switch (err) {
                 error.FileTooBig => {
                     try stderr_file.print(

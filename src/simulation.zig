@@ -58,6 +58,10 @@ pub const State = struct {
     pub fn get_power(self: State, pos: Pos) Power {
         return self.get_block(pos).power();
     }
+
+    pub fn grid_len(self: State) usize {
+        return self.bounds[0] * self.bounds[1] * self.bounds[2];
+    }
 };
 
 test "State compiles!" {
