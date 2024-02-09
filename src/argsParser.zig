@@ -10,8 +10,19 @@ pub const CommandEnum = enum {
     help,
 };
 
-pub const Run = struct { filename: ?[]const u8 = null };
-pub const Help = struct { program: []const u8, command: ?[]const u8 = null };
+pub const Run = struct {
+    filename: ?[]const u8 = null,
+
+    const small_description = "Run yellowstone";
+    const big_description = bd_run;
+};
+pub const Help = struct {
+    program: []const u8,
+    command: ?[]const u8 = null,
+
+    const small_description = "Display information on commands";
+    const big_description = bd_help;
+};
 
 pub const Command = union(CommandEnum) {
     run: Run,
@@ -41,37 +52,75 @@ const commands_info = struct {
             std.mem.eql(u8, tag.name, arg);
     }
 
-    const is_implemented_table = .{
-        .run = true,
-        .replay = false,
-        .@"test" = false,
-        .record = false,
-        .help = true,
+    fn ensure_is_implemented(comptime T: type, comptime tag: EnumField) void {
+        comptime {
+            if (!@hasDecl(T, "small_description")) {
+                @compileError("Command " ++ tag.name ++
+                    "'s implementation " ++ @typeName(T) ++
+                    " does not have small_description");
+            }
+            if (!std.meta.trait.isZigString(@TypeOf(@field(T, "small_description")))) {
+                @compileError("Command " ++ tag.name ++
+                    "'s implementation " ++ @typeName(T) ++
+                    ".small_description must be a zig string" ++
+                    ", but has type " ++ @typeName(@TypeOf(@field(T, "small_description"))));
+            }
+
+            if (!@hasDecl(T, "big_description")) {
+                @compileError("Command " ++ tag.name ++
+                    "'s implementation " ++ @typeName(T) ++
+                    " does not have big_description");
+            }
+            if (@TypeOf(@field(T, "big_description")) != fn ([]const u8, anytype) void) {
+                @compileError("Command " ++ tag.name ++
+                    "'s implementation " ++ @typeName(T) ++
+                    ".big_description must be a fn ([]const u8, anytype) void" ++
+                    ", but has type " ++ @typeName(@TypeOf(@field(T, "small_description"))));
+            }
+        }
+    }
+
+    const implementations_table = .{
+        .run = Run,
+        .replay = null,
+        .@"test" = null,
+        .record = null,
+        .help = Help,
     };
+    fn impl(comptime tag: EnumField) @TypeOf(@field(implementations_table, tag.name)) {
+        return @field(implementations_table, tag.name);
+    }
+
     fn is_implemented(comptime tag: EnumField) bool {
-        return @field(is_implemented_table, tag.name);
+        return comptime blk: {
+            const T = impl(tag);
+
+            if (@TypeOf(T) != type) break :blk false;
+            ensure_is_implemented(T, tag);
+            break :blk true;
+        };
     }
 
-    const small_description_table = .{
-        .run = "Run yellowstone",
-        .help = "Display information on commands",
-    };
     fn small_description(comptime tag: EnumField) []const u8 {
-        if (comptime !is_implemented(tag)) {
-            @compileError("command \"" ++ tag.name ++ "\" is not implemented");
-        }
-        return @field(small_description_table, tag.name);
+        return comptime blk: {
+            if (!is_implemented(tag)) {
+                @compileError("command \"" ++ tag.name ++ "\" is not implemented");
+            }
+            break :blk impl(tag).small_description;
+        };
     }
 
-    const big_description_table = .{
-        .run = bd_run,
-        .help = bd_help,
-    };
-    fn big_description(comptime tag: EnumField, program: []const u8, error_writer: anytype) void {
-        if (comptime !is_implemented(tag)) {
-            @compileError("command \"" ++ tag.name ++ "\" is not implemented");
-        }
-        return @field(big_description_table, tag.name)(program, error_writer);
+    // Note: this need inline
+    // References:
+    // https://github.com/ziglang/zig/issues/17445
+    // https://github.com/ziglang/zig/issues/17636
+    inline fn big_description(comptime tag: EnumField) fn (program: []const u8, error_writer: anytype) void {
+        return comptime blk: {
+            if (!is_implemented(tag)) {
+                @compileError("command \"" ++ tag.name ++ "\" is not implemented");
+            }
+            break :blk impl(tag).big_description;
+        };
     }
 };
 
@@ -134,14 +183,14 @@ pub fn help(inputs: Help, error_writer: anytype) void {
             if ((comptime commands_info.is_implemented(tag)) and
                 commands_info.is_equal(tag, command))
             {
-                break commands_info.big_description(tag, inputs.program, error_writer);
+                break commands_info.big_description(tag)(inputs.program, error_writer);
             }
         } else blk: {
             commands_info.print_invalid_command(command, error_writer);
-            break :blk commands_info.big_description_table.help(inputs.program, error_writer);
+            break :blk commands_info.implementations_table.help.big_description(inputs.program, error_writer);
         }
     else
-        commands_info.big_description_table.help(inputs.program, error_writer);
+        commands_info.implementations_table.help.big_description(inputs.program, error_writer);
 }
 
 fn bd_run(program: []const u8, error_writer: anytype) void {
@@ -180,7 +229,7 @@ fn bd_help(program: []const u8, error_writer: anytype) void {
                 "{s: <15} {s}\n",
                 .{
                     tag.name,
-                    comptime commands_info.small_description(tag),
+                    commands_info.small_description(tag),
                 },
             ) catch {};
         } else {
