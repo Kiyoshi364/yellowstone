@@ -70,7 +70,7 @@ const default_state = struct {
 
         var data = @as([grid_len]sim.DrawInfo, undefined);
 
-        @setEvalBranchQuota(0x183A);
+        @setEvalBranchQuota(0x1842);
         const deser = lib_deser.deserialize_alloced(
             sim.DrawInfo,
             header,

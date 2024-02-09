@@ -695,11 +695,26 @@ pub const DrawInfo = packed struct {
 
     pub fn to_block(data: DrawInfo) Block {
         return switch (data.block_type) {
-            .empty => .{ .empty = .{} },
-            .source => .{ .source = .{} },
-            .wire => .{ .wire = .{ .power = @enumFromInt(data.power) } },
-            .block => .{ .block = .{ .power = @enumFromInt(data.power) } },
-            .led => .{ .led = .{ .power = @enumFromInt(data.power) } },
+            .empty => blk: {
+                std.debug.assert(data.valid_fields == ValidFields.none);
+                break :blk .{ .empty = .{} };
+            },
+            .source => blk: {
+                std.debug.assert(data.valid_fields == ValidFields.none);
+                break :blk .{ .source = .{} };
+            },
+            .wire => blk: {
+                std.debug.assert(data.valid_fields == ValidFields.none);
+                break :blk .{ .wire = .{ .power = @enumFromInt(data.power) } };
+            },
+            .block => blk: {
+                std.debug.assert(data.valid_fields == ValidFields.none);
+                break :blk .{ .block = .{ .power = @enumFromInt(data.power) } };
+            },
+            .led => blk: {
+                std.debug.assert(data.valid_fields == ValidFields.none);
+                break :blk .{ .led = .{ .power = @enumFromInt(data.power) } };
+            },
             .repeater => blk: {
                 std.debug.assert(@intFromEnum(data.valid_fields) ==
                     @intFromEnum(ValidFields.all));
@@ -713,7 +728,7 @@ pub const DrawInfo = packed struct {
             },
             .comparator => blk: {
                 std.debug.assert(@intFromEnum(data.valid_fields) ==
-                    (@intFromEnum(ValidFields.all) ^ @intFromEnum(ValidFields.info)));
+                    @intFromEnum(ValidFields.all.without(ValidFields.info)));
                 break :blk .{ .comparator = .{
                     .facing = data.dir,
                     .memory = data.memory,
@@ -722,7 +737,7 @@ pub const DrawInfo = packed struct {
             },
             .negator => blk: {
                 std.debug.assert(@intFromEnum(data.valid_fields) ==
-                    (@intFromEnum(ValidFields.all) ^ @intFromEnum(ValidFields.info)));
+                    @intFromEnum(ValidFields.all.without(ValidFields.info)));
                 break :blk .{ .negator = .{
                     .facing = data.dir,
                     .memory = @intCast(data.memory),
