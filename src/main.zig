@@ -158,6 +158,7 @@ pub fn main() !void {
         .replay => command_not_implemented(cmd, stderr_file),
         .@"test" => command_not_implemented(cmd, stderr_file),
         .record => command_not_implemented(cmd, stderr_file),
+        .help => |inputs| argsParser.help(inputs, stderr_file),
     };
 }
 
