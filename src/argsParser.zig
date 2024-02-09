@@ -11,7 +11,7 @@ pub const CommandEnum = enum {
 };
 
 pub const Run = struct { filename: ?[]const u8 = null };
-pub const Help = struct { program: []const u8 };
+pub const Help = struct { program: []const u8, command: ?[]const u8 = null };
 
 pub const Command = union(CommandEnum) {
     run: Run,
@@ -28,6 +28,18 @@ const info_CommandEnum = @typeInfo(CommandEnum).Enum;
 const commands_info = struct {
     const EnumField = std.builtin.Type.EnumField;
     const command_count = info_CommandEnum.fields.len;
+
+    fn print_invalid_command(command: []const u8, error_writer: anytype) void {
+        return error_writer.print(
+            "error: invalid command: \"{s}\"\n",
+            .{command},
+        ) catch {};
+    }
+
+    fn is_equal(comptime tag: EnumField, arg: []const u8) bool {
+        return (comptime is_implemented(tag)) and
+            std.mem.eql(u8, tag.name, arg);
+    }
 
     const is_implemented_table = .{
         .run = true,
@@ -50,6 +62,17 @@ const commands_info = struct {
         }
         return @field(small_description_table, tag.name);
     }
+
+    const big_description_table = .{
+        .run = bd_run,
+        .help = bd_help,
+    };
+    fn big_description(comptime tag: EnumField, program: []const u8, error_writer: anytype) void {
+        if (comptime !is_implemented(tag)) {
+            @compileError("command \"" ++ tag.name ++ "\" is not implemented");
+        }
+        return @field(big_description_table, tag.name)(program, error_writer);
+    }
 };
 
 pub fn parseArgs(
@@ -62,7 +85,7 @@ pub fn parseArgs(
 
     const cmd = if (opt_arg) |arg|
         inline for (info_CommandEnum.fields) |tag| {
-            if (std.mem.eql(u8, tag.name, arg)) {
+            if (commands_info.is_equal(tag, arg)) {
                 break @unionInit(
                     Command,
                     tag.name,
@@ -74,10 +97,7 @@ pub fn parseArgs(
                 );
             }
         } else {
-            error_writer.print(
-                "error: invalid command: \"{s}\"\n",
-                .{arg},
-            ) catch {};
+            commands_info.print_invalid_command(arg, error_writer);
             return Command{ .help = .{ .program = program } };
         }
     else
@@ -101,20 +121,58 @@ fn parseHelp(
     argsIter: *std.process.ArgIterator,
     program: []const u8,
 ) Help {
-    _ = argsIter.next();
+    const command = argsIter.next();
     return .{
         .program = program,
+        .command = command,
     };
 }
 
 pub fn help(inputs: Help, error_writer: anytype) void {
+    return if (inputs.command) |command|
+        inline for (info_CommandEnum.fields) |tag| {
+            if ((comptime commands_info.is_implemented(tag)) and
+                commands_info.is_equal(tag, command))
+            {
+                break commands_info.big_description(tag, inputs.program, error_writer);
+            }
+        } else blk: {
+            commands_info.print_invalid_command(command, error_writer);
+            break :blk commands_info.big_description_table.help(inputs.program, error_writer);
+        }
+    else
+        commands_info.big_description_table.help(inputs.program, error_writer);
+}
+
+fn bd_run(program: []const u8, error_writer: anytype) void {
+    error_writer.print(
+        \\usage: {[program]s} run [initial_state_file]
+        \\
+        \\Start a simulation.
+        \\When exit, writes last state to dump_state.ys.txt
+        \\
+        \\arguments:
+        \\
+        \\state_filename      file to load initial state.
+        \\                    If invalid or not provided default state is loaded.
+        \\
+    ,
+        .{ .program = program },
+    ) catch {};
+    return;
+}
+
+fn bd_help(program: []const u8, error_writer: anytype) void {
     error_writer.print(
         \\usage: {[program]s} <command> <command specific arguments>
+        \\
+        \\To learn more about a specific <command> try:
+        \\$ {[program]s} help <command>
         \\
         \\=== list of valid commands ===
         \\
     ,
-        .{ .program = inputs.program },
+        .{ .program = program },
     ) catch {};
     inline for (info_CommandEnum.fields) |tag| {
         if (comptime commands_info.is_implemented(tag)) {
