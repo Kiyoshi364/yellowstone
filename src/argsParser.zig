@@ -89,7 +89,7 @@ pub fn parseArgs(
                 break @unionInit(
                     Command,
                     tag.name,
-                    switch (@as(CommandEnum, @enumFromInt(tag.value))) {
+                    switch (@field(CommandEnum, tag.name)) {
                         .run => parseRun(argsIter),
                         .help => parseHelp(argsIter, program),
                         else => .{},
