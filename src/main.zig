@@ -294,7 +294,9 @@ fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
     var loop = true;
     return while (loop) {
         const size = try reader.read(&buffer);
-        if (size == 0) continue;
+        if (size == 0) {
+            break null;
+        }
         switch (buffer[0]) {
             ' ' => break .{ .step = .{} },
             '\r', '\n' => break .{ .putBlock = .{} },
@@ -327,6 +329,11 @@ fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
             '.' => break .{ .nextRotate = .{} },
             ',' => break .{ .prevRotate = .{} },
             'q' => break null,
+            // 0x03: Ctrl-C (End of Text)
+            // 0x04: Ctrl-D (End of Transmition)
+            // 0x17: Ctrl-W (End of Transmition Block)
+            // 0x19: Ctrl-Y (End of Medium)
+            0x03, 0x04, 0x17, 0x19 => break null,
             else => {},
         }
     } else unreachable;
