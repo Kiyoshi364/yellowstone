@@ -70,7 +70,8 @@ const default_state = struct {
 
         var data = @as([grid_len]sim.DrawInfo, undefined);
 
-        @setEvalBranchQuota(0x1842);
+        const CR_incr = 6 * (2 + (header.bounds[0] - 1) + (header.bounds[0] * header.bounds[1]));
+        @setEvalBranchQuota(0x192C + CR_incr);
         const deser = lib_deser.deserialize_alloced(
             sim.DrawInfo,
             header,

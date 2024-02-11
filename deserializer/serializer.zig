@@ -44,7 +44,34 @@ fn parse_hex(comptime Uint: type, buf: []const u8) !Uint {
     return acc;
 }
 
-fn read_exact(
+fn read_only_ln(reader: anytype) !void {
+    var read = @as(usize, undefined);
+    var buffer = @as([1]u8, undefined);
+
+    read = try reader.readAll(&buffer);
+    if (read == 0) {
+        return error.InvalidStr;
+    }
+    if (buffer[0] == '\r') {
+        read = try reader.readAll(&buffer);
+        if (read == 0) {
+            return error.InvalidStr;
+        }
+    }
+    if (buffer[0] != '\n') {
+        return error.InvalidStr;
+    }
+}
+
+fn read_exact_ln(
+    comptime str: []const u8,
+    reader: anytype,
+) !void {
+    try read_exact_noln(str, reader);
+    try read_only_ln(reader);
+}
+
+fn read_exact_noln(
     comptime str: []const u8,
     reader: anytype,
 ) !void {
@@ -60,6 +87,27 @@ fn read_exact(
             return error.InvalidStr;
         }
     }
+}
+
+fn read_exact(
+    comptime str: []const u8,
+    reader: anytype,
+) !void {
+    return if (str.len == 0)
+        void{}
+    else if (str[str.len - 1] == '\n') blk: {
+        const str_1 = str[0 .. str.len - 1];
+        comptime {
+            for (str_1, 0..) |c, i| {
+                if (c == '\n') {
+                    @compileError("read_exact: Invalid str: '\n' at " ++
+                        std.fmt.comptimePrint("{d}", .{i}) ++
+                        " in: " ++ str);
+                }
+            }
+        }
+        break :blk read_exact_ln(str_1, reader);
+    } else read_exact_noln(str, reader);
 }
 
 const Ubounds = u16;
