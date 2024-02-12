@@ -345,122 +345,134 @@ extern "kernel32" fn SetConsoleMode(
 ) callconv(std.os.windows.WINAPI) std.os.windows.BOOL;
 
 const WindowsTerm = struct {
-    stdinHandle: std.os.windows.HANDLE,
-    old_inMode: std.os.windows.DWORD,
-    stdoutHandle: std.os.windows.HANDLE,
-    old_outMode: std.os.windows.DWORD,
+    // References:
+    // https://learn.microsoft.com/en-us/windows/console/console-functions
+    // https://learn.microsoft.com/en-us/windows/console/getconsolemode
+    // https://learn.microsoft.com/en-us/windows/console/setconsolemode
+
+    stdin: ?TermState,
+    stdout: ?TermState,
+
+    const win = std.os.windows;
+    const wink32 = win.kernel32;
+
+    const TermState = struct {
+        handle: std.os.windows.HANDLE,
+        old_mode: std.os.windows.DWORD,
+
+        fn init(asdf: bool) !?TermState {
+            const handle = wink32.GetStdHandle(asdf) orelse {
+                std.debug.print("{}\n", .{wink32.GetLastError()});
+                return error.GetStdInHandle;
+            };
+
+            if (handle == win.INVALID_HANDLE_VALUE) {
+                std.debug.print("{}\n", .{wink32.GetLastError()});
+                return error.InvalidStdInHandle;
+            }
+
+            var old_mode = @as(win.DWORD, 0);
+            if (wink32.GetConsoleMode(handle, &old_mode) == 0) {
+                const last_error = wink32.GetLastError();
+                switch (last_error) {
+                    .INVALID_HANDLE => return null,
+                    else => {
+                        std.debug.print("{}\n", .{last_error});
+                        return error.GetConsoleModeError;
+                    },
+                }
+            }
+
+            return TermState{
+                .handle = handle,
+                .old_mode = old_mode,
+            };
+        }
+
+        fn deinit(self: TermState) !void {
+            if (SetConsoleMode(self.handle, self.old_mode) == 0) {
+                std.debug.print("{}\n", .{wink32.GetLastError()});
+                return error.SetConsoleModeError;
+            }
+        }
+    };
 
     fn config_term() !WindowsTerm {
-        // References:
-        // https://learn.microsoft.com/en-us/windows/console/console-functions
-        // https://learn.microsoft.com/en-us/windows/console/getconsolemode
-        // https://learn.microsoft.com/en-us/windows/console/setconsolemode
-        const win = std.os.windows;
-        const wink32 = win.kernel32;
+        const stdin = try TermState.init(win.STD_INPUT_HANDLE);
+        if (stdin) |state| {
+            const new_inMode = blk2: {
+                const ENABLE_ECHO_INPUT = @as(win.DWORD, 0x0004);
+                // const ENABLE_INSERT_MODE = @as(win.DWORD, 0x0020);
+                const ENABLE_LINE_INPUT = @as(win.DWORD, 0x0002);
+                // const ENABLE_MOUSE_INPUT = @as(win.DWORD, 0x0010);
+                // const ENABLE_PROCESSED_INPUT = @as(win.DWORD, 0x0001);
+                // const ENABLE_QUICK_EDIT_MODE = @as(win.DWORD, 0x0040);
+                // const ENABLE_WINDOW_INPUT = @as(win.DWORD, 0x0008);
+                const ENABLE_VIRTUAL_TERMINAL_INPUT = @as(win.DWORD, 0x0200);
 
-        const stdinHandle = wink32.GetStdHandle(win.STD_INPUT_HANDLE) orelse {
-            std.debug.print("{}\n", .{wink32.GetLastError()});
-            return error.GetStdInHandle;
-        };
+                var new_inMode = state.old_mode;
+                new_inMode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT);
+                new_inMode |= ENABLE_VIRTUAL_TERMINAL_INPUT;
+                break :blk2 new_inMode;
+            };
 
-        if (stdinHandle == win.INVALID_HANDLE_VALUE) {
-            std.debug.print("{}\n", .{wink32.GetLastError()});
-            return error.InvalidStdInHandle;
-        }
-
-        const inMode = blk: {
-            var inMode = @as(win.DWORD, 0);
-            if (wink32.GetConsoleMode(stdinHandle, &inMode) == 0) {
+            if (SetConsoleMode(state.handle, new_inMode) == 0) {
                 std.debug.print("{}\n", .{wink32.GetLastError()});
-                return error.GetConsoleModeError;
+                return error.SetConsoleModeError;
             }
-            break :blk inMode;
-        };
-
-        const new_inMode = blk: {
-            const ENABLE_ECHO_INPUT = @as(win.DWORD, 0x0004);
-            // const ENABLE_INSERT_MODE = @as(win.DWORD, 0x0020);
-            const ENABLE_LINE_INPUT = @as(win.DWORD, 0x0002);
-            // const ENABLE_MOUSE_INPUT = @as(win.DWORD, 0x0010);
-            // const ENABLE_PROCESSED_INPUT = @as(win.DWORD, 0x0001);
-            // const ENABLE_QUICK_EDIT_MODE = @as(win.DWORD, 0x0040);
-            // const ENABLE_WINDOW_INPUT = @as(win.DWORD, 0x0008);
-            const ENABLE_VIRTUAL_TERMINAL_INPUT = @as(win.DWORD, 0x0200);
-
-            var new_inMode = inMode;
-            new_inMode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT);
-            new_inMode |= ENABLE_VIRTUAL_TERMINAL_INPUT;
-            break :blk new_inMode;
-        };
-
-        if (SetConsoleMode(stdinHandle, new_inMode) == 0) {
-            std.debug.print("{}\n", .{wink32.GetLastError()});
-            return error.SetConsoleModeError;
+        } else {
+            // Empty
         }
+        errdefer stdin.deinit();
 
-        const stdoutHandle = wink32.GetStdHandle(win.STD_OUTPUT_HANDLE) orelse {
-            std.debug.print("{}\n", .{wink32.GetLastError()});
-            return error.GetStdInHandle;
-        };
-        if (stdoutHandle == win.INVALID_HANDLE_VALUE) {
-            std.debug.print("{}\n", .{wink32.GetLastError()});
-            return error.InvalidStdOutHandle;
-        }
-        const outMode = blk: {
-            var outMode = @as(win.DWORD, 0);
-            if (wink32.GetConsoleMode(stdoutHandle, &outMode) == 0) {
+        const stdout = try TermState.init(win.STD_OUTPUT_HANDLE);
+        if (stdout) |state| {
+            const new_outMode = blk: {
+                const ENABLE_PROCESSED_OUTPUT = @as(win.DWORD, 0x0001);
+                // const ENABLE_WRAP_AT_EOL_OUTPUT = @as(win.DWORD, 0x0002);
+                const ENABLE_VIRTUAL_TERMINAL_PROCESSING = @as(win.DWORD, 0x0004);
+                // const DISABLE_NEWLINE_AUTO_RETURN = @as(win.DWORD, 0x0008);
+                // const ENABLE_LVB_GRID_WORLDWIDE = @as(win.DWORD, 0x0010);
+
+                var new_outMode = state.old_mode;
+                new_outMode |= (ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+                break :blk new_outMode;
+            };
+
+            if (SetConsoleMode(state.handle, new_outMode) == 0) {
                 std.debug.print("{}\n", .{wink32.GetLastError()});
-                return error.GetConsoleModeError;
+                return error.SetConsoleModeError;
             }
-            break :blk outMode;
-        };
-
-        const new_outMode = blk: {
-            const ENABLE_PROCESSED_OUTPUT = @as(win.DWORD, 0x0001);
-            // const ENABLE_WRAP_AT_EOL_OUTPUT = @as(win.DWORD, 0x0002);
-            const ENABLE_VIRTUAL_TERMINAL_PROCESSING = @as(win.DWORD, 0x0004);
-            // const DISABLE_NEWLINE_AUTO_RETURN = @as(win.DWORD, 0x0008);
-            // const ENABLE_LVB_GRID_WORLDWIDE = @as(win.DWORD, 0x0010);
-
-            var new_outMode = outMode;
-            new_outMode |= (ENABLE_PROCESSED_OUTPUT | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
-            break :blk new_outMode;
-        };
-
-        if (SetConsoleMode(stdoutHandle, new_outMode) == 0) {
-            std.debug.print("{}\n", .{wink32.GetLastError()});
-            return error.SetConsoleModeError;
+        } else {
+            // Empty
         }
 
         return .{
-            .stdinHandle = stdinHandle,
-            .old_inMode = inMode,
-            .stdoutHandle = stdoutHandle,
-            .old_outMode = outMode,
+            .stdin = stdin,
+            .stdout = stdout,
         };
     }
 
     fn unconfig_term(self: WindowsTerm) !void {
-        const wink32 = std.os.windows.kernel32;
-
-        if (SetConsoleMode(self.stdinHandle, self.old_inMode) == 0) {
-            std.debug.print("{}\n", .{wink32.GetLastError()});
-            return error.SetConsoleModeError;
-        }
-
-        if (SetConsoleMode(self.stdinHandle, self.old_inMode) == 0) {
-            std.debug.print("{}\n", .{wink32.GetLastError()});
-            return error.SetConsoleModeError;
-        }
+        if (self.stdin) |state| try state.deinit();
+        if (self.stdout) |state| try state.deinit();
     }
 };
 
 const LinuxTerm = struct {
-    old_term: std.os.termios,
+    // Termios 3 part Piece of Knowledge (ignoring 3rd):
+    // https://blog.nelhage.com/2009/12/a-brief-introduction-to-termios/
+    // https://blog.nelhage.com/2009/12/a-brief-introduction-to-termios-termios3-and-stty/
+    // Reference:
+    // man 3 termios   # Look for c_lflag, (non-)canonical mode and raw mode
+    old_term: ?std.os.termios,
 
     fn config_term() !LinuxTerm {
         const fd = 0;
-        const old_term = try std.os.tcgetattr(fd);
+        const old_term = std.os.tcgetattr(fd) catch |err| switch (err) {
+            error.NotATerminal => return .{ .old_term = null },
+            error.Unexpected => return err,
+        };
         var new_term = old_term;
         new_term.lflag &= ~(std.os.linux.ICANON | std.os.linux.ECHO);
         try std.os.tcsetattr(fd, .NOW, new_term);
@@ -470,8 +482,10 @@ const LinuxTerm = struct {
     }
 
     fn unconfig_term(self: LinuxTerm) !void {
-        const fd = 0;
-        try std.os.tcsetattr(fd, .NOW, self.old_term);
+        if (self.old_term) |old_term| {
+            const fd = 0;
+            try std.os.tcsetattr(fd, .NOW, old_term);
+        }
     }
 };
 
