@@ -360,8 +360,8 @@ const WindowsTerm = struct {
         handle: std.os.windows.HANDLE,
         old_mode: std.os.windows.DWORD,
 
-        fn init(asdf: bool) !?TermState {
-            const handle = wink32.GetStdHandle(asdf) orelse {
+        fn init(handle_num: std.os.windows.DWORD) !?TermState {
+            const handle = wink32.GetStdHandle(handle_num) orelse {
                 std.debug.print("{}\n", .{wink32.GetLastError()});
                 return error.GetStdInHandle;
             };
@@ -423,7 +423,7 @@ const WindowsTerm = struct {
         } else {
             // Empty
         }
-        errdefer stdin.deinit();
+        errdefer if (stdin) |t| t.deinit() catch {};
 
         const stdout = try TermState.init(win.STD_OUTPUT_HANDLE);
         if (stdout) |state| {
