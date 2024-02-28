@@ -343,13 +343,13 @@ fn read_ctlinput(reader: anytype, writer: anytype) !?ctl.CtlInput {
 fn command_line(reader: anytype, writer: anytype) !?ctl.CtlInput {
     var line_buffer = @as([64]u8, undefined);
     return if (try cmd_line.command_line(&line_buffer, reader, writer, .{})) |line| blk: {
-        try writer.print(
-            \\
-            \\line:{s}§
-            \\
-        ,
-            .{line},
-        );
+        try writer.print("\n", .{});
+        const opt_cmd =
+            try cmd_line.line_parse(ctl.CtlInput, line, writer);
+        if (opt_cmd) |cmd| {
+            break :blk cmd;
+        }
+        try writer.print("Unrecognized or incomplete command :{s}§\n", .{line});
         break :blk null;
     } else null;
 }

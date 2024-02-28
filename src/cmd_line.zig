@@ -363,3 +363,120 @@ pub fn command_line(
         }
     };
 }
+
+pub fn line_parse(
+    comptime T: type,
+    line: []const u8,
+    writer: anytype,
+) !?T {
+    const info = blk: {
+        const info = @typeInfo(T);
+        if (info != .Union) {
+            @compileError("expected " ++ @typeName(T) ++ " to be a Union");
+        }
+
+        inline for (info.Union.fields) |f| {
+            switch (@typeInfo(f.type)) {
+                .Void,
+                .Enum,
+                => {
+                    // Implemented!
+                },
+                .Bool,
+                .Int,
+                .Union,
+                => {
+                    // To be implemented in the future!
+                    @compileError("field " ++ f.name ++
+                        " with type " ++ @typeName(f.type) ++
+                        " inside type " ++ @typeName(T) ++
+                        " is not supported (maybe in the future)");
+                },
+                .Struct => |fi| {
+                    // Special case
+                    if (fi.fields.len > 0) {
+                        @compileError("field " ++ f.name ++
+                            " with type " ++ @typeName(f.type) ++
+                            " inside type " ++ @typeName(T) ++
+                            " is not supported. Structs must have no fields");
+                    }
+                },
+                else => {
+                    // To be implemented in the future!
+                    @compileError("field " ++ f.name ++
+                        " with type " ++ @typeName(f.type) ++
+                        " inside type " ++ @typeName(T) ++
+                        " is not supported");
+                },
+            }
+        }
+        break :blk info.Union;
+    };
+
+    return inline for (info.fields) |f| {
+        if (prefix(line, f.name)) |i| {
+            break if (try arg_parse(f.type, line[i..], writer)) |arg|
+                @unionInit(T, f.name, arg)
+            else blk: {
+                try writer.print(
+                    "Command {s}: missing argument\n",
+                    .{f.name},
+                );
+                try warn_ignoring_prompt(line[i..], writer);
+                break :blk null;
+            };
+        } else {
+            // Nothing
+        }
+    } else null;
+}
+
+fn warn_ignoring_prompt(line: []const u8, writer: anytype) !void {
+    if (line.len > 0) {
+        try writer.print(
+            "WARNING: ignoring end of prompt: \"{s}\"\n",
+            .{line},
+        );
+    }
+}
+
+fn arg_parse(
+    comptime T: type,
+    line: []const u8,
+    writer: anytype,
+) !?T {
+    return switch (@typeInfo(T)) {
+        .Void => try warn_ignoring_prompt(line, writer),
+        .Struct => |info| blk: {
+            std.debug.assert(info.fields.len == 0);
+            try warn_ignoring_prompt(line, writer);
+            break :blk .{};
+        },
+        .Enum => |info| inline for (info.fields) |f| {
+            if (prefix(line, f.name)) |i| {
+                try warn_ignoring_prompt(line[i..], writer);
+                break @enumFromInt(f.value);
+            }
+        } else null,
+        .Bool,
+        .Int,
+        .Union,
+        => @compileError("unreachable"),
+        else => @compileError("unreachable"),
+    };
+}
+
+fn prefix(big: []const u8, small: []const u8) ?usize {
+    return if (big.len < small.len)
+        null
+    else for (big[0..small.len], small) |a, b| {
+        if (a != b) {
+            break null;
+        }
+    } else if (big.len == small.len)
+        small.len
+    else if (big[small.len] == ' ')
+        small.len + 1
+    else
+        null;
+}
