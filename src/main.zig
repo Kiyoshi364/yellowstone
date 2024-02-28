@@ -8,6 +8,8 @@ pub const ctl = @import("controler.zig");
 
 const argsParser = @import("argsParser.zig");
 
+const cmd_line = @import("cmd_line.zig");
+
 var global_term: ?Term = null;
 
 fn serialize(
@@ -182,9 +184,6 @@ fn run(
 ) !void {
     const main_alloc = main_arena.allocator();
 
-    var brin = std.io.bufferedReader(stdin_file);
-    const stdin = brin.reader();
-
     var bwout = std.io.bufferedWriter(stdout_file);
     const stdout = bwout.writer();
 
@@ -264,7 +263,8 @@ fn run(
     try bwout.flush();
 
     while (true) {
-        const ctlinput = try read_ctlinput(&stdin) orelse {
+        const ctlinput =
+            try read_ctlinput(&stdin_file, &stdout_file) orelse {
             break;
         };
 
@@ -288,10 +288,9 @@ fn run(
     }
 }
 
-fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
+fn read_ctlinput(reader: anytype, writer: anytype) !?ctl.CtlInput {
     var buffer = @as([1]u8, undefined);
-    var loop = true;
-    return while (loop) {
+    return while (true) {
         const size = try reader.read(&buffer);
         if (size == 0) {
             break null;
@@ -327,6 +326,9 @@ fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
             'p' => break .{ .prevBlock = .{} },
             '.' => break .{ .nextRotate = .{} },
             ',' => break .{ .prevRotate = .{} },
+            ':' => if (try command_line(reader, writer)) |ctlinput|
+                break ctlinput
+            else {},
             'q' => break null,
             // 0x03: Ctrl-C (End of Text)
             // 0x04: Ctrl-D (End of Transmition)
@@ -336,6 +338,20 @@ fn read_ctlinput(reader: anytype) !?ctl.CtlInput {
             else => {},
         }
     } else unreachable;
+}
+
+fn command_line(reader: anytype, writer: anytype) !?ctl.CtlInput {
+    var line_buffer = @as([64]u8, undefined);
+    return if (try cmd_line.command_line(&line_buffer, reader, writer, .{})) |line| blk: {
+        try writer.print(
+            \\
+            \\line:{s}§
+            \\
+        ,
+            .{line},
+        );
+        break :blk null;
+    } else null;
 }
 
 extern "kernel32" fn SetConsoleMode(
