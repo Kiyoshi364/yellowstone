@@ -1,13 +1,13 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const Direction = @import("Direction.zig");
-const DirectionEnum = Direction.DirectionEnum;
-const Axis = Direction.Axis;
-
-const sim = @import("simulation.zig");
+const sim = @import("simulation/simulation.zig");
 const SimState = sim.State;
 const SimInput = sim.Input;
+
+const Direction = sim.Direction;
+const DirectionEnum = Direction.DirectionEnum;
+const Axis = Direction.Axis;
 
 const Upos = SimState.Upos;
 const Iupos = @Type(.{ .Int = .{
@@ -15,12 +15,12 @@ const Iupos = @Type(.{ .Int = .{
     .signedness = .signed,
 } });
 
-const block = @import("block.zig");
+const block = sim.block;
 const Block = block.Block;
 const BlockType = block.BlockType;
 const Repeater = block.Repeater;
 
-const power = @import("power.zig");
+const power = sim.power;
 
 pub const step_controler = update;
 

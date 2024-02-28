@@ -3,8 +3,7 @@ const isWindows = @import("builtin").os.tag == .windows;
 
 const lib_deser = @import("lib_deser");
 
-pub const block = @import("block.zig");
-pub const sim = @import("simulation.zig");
+pub const sim = @import("simulation/simulation.zig");
 pub const ctl = @import("controler.zig");
 
 const argsParser = @import("argsParser.zig");
@@ -32,7 +31,7 @@ fn serialize(
 }
 
 fn deserialize(
-    out_grid: []sim.Block,
+    out_grid: []sim.block.Block,
     header: lib_deser.Header,
     reader: anytype,
     alloc: std.mem.Allocator,
@@ -54,12 +53,12 @@ fn deserialize(
 }
 
 const default_state = struct {
-    grid: []sim.Block,
+    grid: []sim.block.Block,
     bounds: sim.State.Pos,
 
     const grid_len = 2 * 8 * 16;
     const default = blk: {
-        var grid = @as([grid_len]sim.Block, undefined);
+        var grid = @as([grid_len]sim.block.Block, undefined);
 
         const initial_buffer = @embedFile("init_state.ys.txt");
 
@@ -90,7 +89,7 @@ const default_state = struct {
 
 fn check_serde(
     sim_state: sim.State,
-    temp_grid: []sim.Block,
+    temp_grid: []sim.block.Block,
     alloc: std.mem.Allocator,
 ) !void {
     const buffer_size = lib_deser.encoding_size(
@@ -219,7 +218,7 @@ fn run(
             const after_header = try buf_stream.getPos();
 
             const grid_len = header.bounds[0] * header.bounds[1] * header.bounds[2];
-            const grids = try main_alloc.alloc(sim.Block, ctlstates.len * grid_len);
+            const grids = try main_alloc.alloc(sim.block.Block, ctlstates.len * grid_len);
 
             for (0..ctlstates.len) |i| {
                 try buf_stream.seekTo(after_header);
@@ -236,11 +235,11 @@ fn run(
         try stderr_file.print("Initializing with default state\n", .{});
 
         const grid_len = default_state.grid.len;
-        const grids = try main_alloc.alloc(sim.Block, ctlstates.len * grid_len);
+        const grids = try main_alloc.alloc(sim.block.Block, ctlstates.len * grid_len);
 
         for (0..ctlstates.len) |i| {
             const grid = grids[i * grid_len .. (i + 1) * grid_len];
-            std.mem.copy(sim.Block, grid, default_state.grid);
+            std.mem.copy(sim.block.Block, grid, default_state.grid);
             const state = .{
                 .grid = grid,
                 .bounds = default_state.bounds,
@@ -510,7 +509,6 @@ pub fn panic(msg: []const u8, trace: ?*ST, ret_addr: ?usize) noreturn {
 
 test "It compiles!" {
     std.testing.refAllDeclsRecursive(@This());
-    std.testing.refAllDeclsRecursive(block);
     std.testing.refAllDeclsRecursive(sim);
     std.testing.refAllDeclsRecursive(ctl);
 }

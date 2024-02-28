@@ -1,15 +1,15 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const block = @import("block.zig");
-pub const Block = block.Block;
+pub const block = @import("block.zig");
+const Block = block.Block;
 
-const Direction = @import("Direction.zig");
+pub const Direction = @import("Direction.zig");
 const DirectionEnum = Direction.DirectionEnum;
 const directions = DirectionEnum.directions;
 
-const power = @import("power.zig");
-pub const Power = power.Power;
+pub const power = @import("power.zig");
+const Power = power.Power;
 
 pub const step_simulation = update;
 
