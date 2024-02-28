@@ -38,6 +38,78 @@ const LineState = struct {
         }
     }
 
+    fn del_WORD_backward(self: *LineState, writer: anytype) !void {
+        const new_cursor = blk: {
+            var new_cursor = self.cursor;
+            while (true and
+                0 < new_cursor and
+                self.buffer[new_cursor - 1] == ' ' and
+                true) : (new_cursor -= 1)
+            {}
+            break :blk while (true and
+                0 < new_cursor and
+                self.buffer[new_cursor - 1] != ' ' and
+                true) : (new_cursor -= 1)
+            {} else new_cursor;
+        };
+        if (new_cursor == self.cursor) {
+            // Nothing
+            std.debug.assert(new_cursor == 0);
+        } else {
+            const diff = self.cursor - new_cursor;
+            const new_size = self.size - diff;
+            { // edit buffer
+                for (0..self.size - self.cursor) |i| {
+                    self.*.buffer[new_cursor + i] =
+                        self.buffer[self.cursor + i];
+                }
+            }
+            { // reprint buffer
+                if (self.cursor < new_size) {
+                    try writer.print(
+                        "{s}",
+                        .{self.buffer[self.cursor..new_size]},
+                    );
+                    for (0..self.size - new_size) |_| {
+                        try writer.print(" ", .{});
+                    }
+                    for (0..self.size - new_cursor) |_| {
+                        try writer.print("\x08", .{});
+                    }
+                    try writer.print(
+                        "{s}",
+                        .{self.buffer[new_cursor..self.cursor]},
+                    );
+                    for (0..diff) |_| {
+                        try writer.print("\x08", .{});
+                    }
+                } else {
+                    for (0..self.size - self.cursor) |_| {
+                        try writer.print(" ", .{});
+                    }
+                    for (0..self.size - self.cursor) |_| {
+                        try writer.print("\x08", .{});
+                    }
+                    for (0..self.cursor - new_size) |_| {
+                        try writer.print("\x08 \x08", .{});
+                    }
+                    for (0..new_size - new_cursor) |_| {
+                        try writer.print("\x08", .{});
+                    }
+                    try writer.print(
+                        "{s}",
+                        .{self.buffer[new_cursor..new_size]},
+                    );
+                    for (0..new_size - new_cursor) |_| {
+                        try writer.print("\x08", .{});
+                    }
+                }
+            }
+            self.*.size = new_size;
+            self.*.cursor = new_cursor;
+        }
+    }
+
     fn write(self: *LineState, c: u8, writer: anytype) !void {
         std.debug.assert(self.cursor <= self.buffer.len);
         std.debug.assert(self.size <= self.buffer.len);
@@ -173,6 +245,67 @@ const LineState = struct {
         try self.unhandle_message(c, writer);
         try self.unhandle_unclearline(writer, prompt);
     }
+
+    const ContinueStop = enum {
+        stop,
+        cont,
+    };
+
+    fn escape(
+        self: *LineState,
+        reader: anytype,
+        writer: anytype,
+        comptime prompt: []const u8,
+    ) !ContinueStop {
+        var once = true;
+        return while (once) : (once = false) {
+            var c = @as(u8, undefined);
+            const size = try reader.read(@as(*[1]u8, &c));
+            if (size == 0) {
+                try self.unhandle('\x1B', writer, prompt);
+                break .stop;
+            }
+            switch (c) {
+                // 0x1B: Ctrl-[ (Escape)
+                0x1B => {
+                    try self.clear(writer);
+                    for (0..prompt.len) |_| {
+                        try writer.print("\x08 \x08", .{});
+                    }
+                    break .stop;
+                },
+                '[' => {
+                    const size2 = try reader.read(@as(*[1]u8, &c));
+                    if (size2 == 0) {
+                        try self.unhandle_clearline(writer, prompt.len);
+                        try self.unhandle_message('\x1B', writer);
+                        try self.unhandle_message('[', writer);
+                        try self.unhandle_unclearline(writer, prompt);
+                        break .stop;
+                    }
+                    switch (c) {
+                        'C' => try self.move_forward(writer),
+                        'D' => try self.move_backward(writer),
+                        else => {
+                            try self.unhandle_clearline(writer, prompt.len);
+                            try self.unhandle_message('\x1B', writer);
+                            try self.unhandle_message('[', writer);
+                            try self.unhandle_message(c, writer);
+                            try self.unhandle_unclearline(writer, prompt);
+                        },
+                    }
+                },
+                // 0x7F: Ctrl-? (Delete)
+                0x7F => try self.del_WORD_backward(writer),
+                else => {
+                    try self.unhandle_clearline(writer, prompt.len);
+                    try self.unhandle_message('\x1B', writer);
+                    try self.unhandle_message(c, writer);
+                    try self.unhandle_unclearline(writer, prompt);
+                },
+            }
+        } else .cont;
+    }
 };
 
 pub fn command_line(
@@ -220,6 +353,11 @@ pub fn command_line(
             },
             // 0x0C: Ctrl-L (Form Feed/New Page)
             0x0C => try state.clear(writer),
+            // 0x1B: Ctrl-[ (Escape)
+            0x1B => switch (try state.escape(reader, writer, config.prompt)) {
+                .stop => break null,
+                .cont => {},
+            },
             // TODO: add utf8 support
             else => try state.unhandle(c, writer, config.prompt),
         }
