@@ -175,6 +175,16 @@ fn command_not_implemented(
     std.os.exit(1);
 }
 
+const RunInput = union(enum) {
+    cmd: RunCommand,
+    ctl: ctl.CtlInput,
+};
+
+const RunCommand = union(enum) {
+    q,
+    quit,
+};
+
 fn run(
     main_arena: *std.heap.ArenaAllocator,
     inputs: argsParser.Run,
@@ -263,14 +273,21 @@ fn run(
     try bwout.flush();
 
     while (true) {
-        const ctlinput =
-            try read_ctlinput(&stdin_file, &stdout_file) orelse {
+        const input =
+            try read_command(&stdin_file, &stdout_file) orelse {
             break;
         };
 
-        try step_controler(&ctlstates[0], ctlinput, alloc);
-        try ctl.draw(ctlstates[0], alloc, stdout);
-        try bwout.flush();
+        switch (input) {
+            .ctl => |ctlinput| {
+                try step_controler(&ctlstates[0], ctlinput, alloc);
+                try ctl.draw(ctlstates[0], alloc, stdout);
+                try bwout.flush();
+            },
+            .cmd => |cmd| switch (cmd) {
+                .q, .quit => break,
+            },
+        }
 
         try check_serde(ctlstates[0].sim_state, ctlstates[1].sim_state.grid, alloc);
 
@@ -288,7 +305,7 @@ fn run(
     }
 }
 
-fn read_ctlinput(reader: anytype, writer: anytype) !?ctl.CtlInput {
+fn read_command(reader: anytype, writer: anytype) !?RunInput {
     var buffer = @as([1]u8, undefined);
     return while (true) {
         const size = try reader.read(&buffer);
@@ -296,38 +313,38 @@ fn read_ctlinput(reader: anytype, writer: anytype) !?ctl.CtlInput {
             break null;
         }
         switch (buffer[0]) {
-            ' ' => break .{ .step = .{} },
-            '\r', '\n' => break .{ .putBlock = .{} },
-            'w' => break .{ .moveCursor = .Up },
-            's' => break .{ .moveCursor = .Down },
-            'a' => break .{ .moveCursor = .Left },
-            'd' => break .{ .moveCursor = .Right },
-            'z' => break .{ .moveCursor = .Above },
-            'x' => break .{ .moveCursor = .Below },
-            'h' => break .{ .moveCamera = .Left },
-            'j' => break .{ .moveCamera = .Down },
-            'k' => break .{ .moveCamera = .Up },
-            'l' => break .{ .moveCamera = .Right },
-            'u' => break .{ .moveCamera = .Above },
-            'i' => break .{ .moveCamera = .Below },
-            'H' => break .{ .retractCamera = .Right },
-            'J' => break .{ .expandCamera = .Down },
-            'K' => break .{ .retractCamera = .Down },
-            'L' => break .{ .expandCamera = .Right },
-            'U' => break .{ .expandCamera = .Above },
-            'I' => break .{ .retractCamera = .Above },
-            'f' => break .{ .flipCamera = .x },
-            'F' => break .{ .flipCamera = .y },
-            'g' => break .{ .flipCamera = .z },
-            'c' => break .{ .swapDimCamera = .z },
-            'v' => break .{ .swapDimCamera = .y },
-            'b' => break .{ .swapDimCamera = .x },
-            'n' => break .{ .nextBlock = .{} },
-            'p' => break .{ .prevBlock = .{} },
-            '.' => break .{ .nextRotate = .{} },
-            ',' => break .{ .prevRotate = .{} },
-            ':' => if (try command_line(reader, writer)) |ctlinput|
-                break ctlinput
+            ' ' => break .{ .ctl = .{ .step = .{} } },
+            '\r', '\n' => break .{ .ctl = .{ .putBlock = .{} } },
+            'w' => break .{ .ctl = .{ .moveCursor = .Up } },
+            's' => break .{ .ctl = .{ .moveCursor = .Down } },
+            'a' => break .{ .ctl = .{ .moveCursor = .Left } },
+            'd' => break .{ .ctl = .{ .moveCursor = .Right } },
+            'z' => break .{ .ctl = .{ .moveCursor = .Above } },
+            'x' => break .{ .ctl = .{ .moveCursor = .Below } },
+            'h' => break .{ .ctl = .{ .moveCamera = .Left } },
+            'j' => break .{ .ctl = .{ .moveCamera = .Down } },
+            'k' => break .{ .ctl = .{ .moveCamera = .Up } },
+            'l' => break .{ .ctl = .{ .moveCamera = .Right } },
+            'u' => break .{ .ctl = .{ .moveCamera = .Above } },
+            'i' => break .{ .ctl = .{ .moveCamera = .Below } },
+            'H' => break .{ .ctl = .{ .retractCamera = .Right } },
+            'J' => break .{ .ctl = .{ .expandCamera = .Down } },
+            'K' => break .{ .ctl = .{ .retractCamera = .Down } },
+            'L' => break .{ .ctl = .{ .expandCamera = .Right } },
+            'U' => break .{ .ctl = .{ .expandCamera = .Above } },
+            'I' => break .{ .ctl = .{ .retractCamera = .Above } },
+            'f' => break .{ .ctl = .{ .flipCamera = .x } },
+            'F' => break .{ .ctl = .{ .flipCamera = .y } },
+            'g' => break .{ .ctl = .{ .flipCamera = .z } },
+            'c' => break .{ .ctl = .{ .swapDimCamera = .z } },
+            'v' => break .{ .ctl = .{ .swapDimCamera = .y } },
+            'b' => break .{ .ctl = .{ .swapDimCamera = .x } },
+            'n' => break .{ .ctl = .{ .nextBlock = .{} } },
+            'p' => break .{ .ctl = .{ .prevBlock = .{} } },
+            '.' => break .{ .ctl = .{ .nextRotate = .{} } },
+            ',' => break .{ .ctl = .{ .prevRotate = .{} } },
+            ':' => if (try command_line(reader, writer)) |input|
+                break input
             else {},
             'q' => break null,
             // 0x03: Ctrl-C (End of Text)
@@ -340,17 +357,29 @@ fn read_ctlinput(reader: anytype, writer: anytype) !?ctl.CtlInput {
     } else unreachable;
 }
 
-fn command_line(reader: anytype, writer: anytype) !?ctl.CtlInput {
+fn command_line(reader: anytype, writer: anytype) !?RunInput {
     var line_buffer = @as([64]u8, undefined);
     return if (try cmd_line.command_line(&line_buffer, reader, writer, .{})) |line| blk: {
         try writer.print("\n", .{});
-        const opt_cmd =
-            try cmd_line.line_parse(ctl.CtlInput, line, writer);
-        if (opt_cmd) |cmd| {
-            break :blk cmd;
-        }
-        try writer.print("Unrecognized or incomplete command :{s}§\n", .{line});
-        break :blk null;
+        break :blk if (try cmd_line.line_parse(
+            RunCommand,
+            line,
+            writer,
+        )) |cmd_input|
+            .{ .cmd = cmd_input }
+        else if (try cmd_line.line_parse(
+            ctl.CtlInput,
+            line,
+            writer,
+        )) |ctl_input|
+            .{ .ctl = ctl_input }
+        else blk2: {
+            try writer.print(
+                "Unrecognized or incomplete command :{s}§\n",
+                .{line},
+            );
+            break :blk2 null;
+        };
     } else null;
 }
 
