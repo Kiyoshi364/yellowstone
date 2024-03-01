@@ -180,7 +180,7 @@ const RunInput = union(enum) {
     ctl: ctl.CtlInput,
 };
 
-const RunCommand = union(enum) {
+const RunCommand = enum {
     q,
     quit,
 };

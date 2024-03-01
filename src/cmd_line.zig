@@ -1,4 +1,5 @@
 const std = @import("std");
+const Type = std.builtin.Type;
 
 pub const Config = struct {
     prompt: []const u8 = ":",
@@ -369,50 +370,72 @@ pub fn line_parse(
     line: []const u8,
     writer: anytype,
 ) !?T {
-    const info = blk: {
-        const info = @typeInfo(T);
-        if (info != .Union) {
-            @compileError("expected " ++ @typeName(T) ++ " to be a Union");
-        }
-
-        inline for (info.Union.fields) |f| {
-            switch (@typeInfo(f.type)) {
-                .Void,
-                .Enum,
-                => {
-                    // Implemented!
-                },
-                .Bool,
-                .Int,
-                .Union,
-                => {
-                    // To be implemented in the future!
-                    @compileError("field " ++ f.name ++
-                        " with type " ++ @typeName(f.type) ++
-                        " inside type " ++ @typeName(T) ++
-                        " is not supported (maybe in the future)");
-                },
-                .Struct => |fi| {
-                    // Special case
-                    if (fi.fields.len > 0) {
+    return switch (@typeInfo(T)) {
+        .Enum => |info| line_parse_enum(T, info, line, writer),
+        .Union => |info| blk2: {
+            inline for (info.fields) |f| {
+                switch (@typeInfo(f.type)) {
+                    .Void,
+                    .Enum,
+                    => {
+                        // Implemented!
+                    },
+                    .Bool,
+                    .Int,
+                    .Union,
+                    => {
+                        // To be implemented in the future!
                         @compileError("field " ++ f.name ++
                             " with type " ++ @typeName(f.type) ++
                             " inside type " ++ @typeName(T) ++
-                            " is not supported. Structs must have no fields");
-                    }
-                },
-                else => {
-                    // To be implemented in the future!
-                    @compileError("field " ++ f.name ++
-                        " with type " ++ @typeName(f.type) ++
-                        " inside type " ++ @typeName(T) ++
-                        " is not supported");
-                },
+                            " is not supported (maybe in the future)");
+                    },
+                    .Struct => |fi| {
+                        // Special case
+                        if (fi.fields.len > 0) {
+                            @compileError("field " ++ f.name ++
+                                " with type " ++ @typeName(f.type) ++
+                                " inside type " ++ @typeName(T) ++
+                                " is not supported. Structs must have no fields");
+                        }
+                    },
+                    else => {
+                        // To be implemented in the future!
+                        @compileError("field " ++ f.name ++
+                            " with type " ++ @typeName(f.type) ++
+                            " inside type " ++ @typeName(T) ++
+                            " is not supported");
+                    },
+                }
             }
-        }
-        break :blk info.Union;
+            break :blk2 line_parse_union(T, info, line, writer);
+        },
+        else => @compileError("expected " ++ @typeName(T) ++ " to be a Union"),
     };
+}
 
+pub fn line_parse_enum(
+    comptime T: type,
+    comptime info: Type.Enum,
+    line: []const u8,
+    writer: anytype,
+) !?T {
+    return inline for (info.fields) |f| {
+        if (prefix(line, f.name)) |i| {
+            try warn_ignoring_prompt(line[i..], writer);
+            break @enumFromInt(f.value);
+        } else {
+            // Nothing
+        }
+    } else null;
+}
+
+pub fn line_parse_union(
+    comptime T: type,
+    comptime info: Type.Union,
+    line: []const u8,
+    writer: anytype,
+) !?T {
     return inline for (info.fields) |f| {
         if (prefix(line, f.name)) |i| {
             break if (try arg_parse(f.type, line[i..], writer)) |arg|
