@@ -176,11 +176,7 @@ fn command_not_implemented(
 }
 
 const RunInput = union(enum) {
-    cmd: RunCommand,
     ctl: ctl.CtlInput,
-};
-
-const RunCommand = enum {
     q,
     quit,
 };
@@ -284,9 +280,7 @@ fn run(
                 try ctl.draw(ctlstates[0], alloc, stdout);
                 try bwout.flush();
             },
-            .cmd => |cmd| switch (cmd) {
-                .q, .quit => break,
-            },
+            .q, .quit => break,
         }
 
         try check_serde(ctlstates[0].sim_state, ctlstates[1].sim_state.grid, alloc);
@@ -362,11 +356,11 @@ fn command_line(reader: anytype, writer: anytype) !?RunInput {
     return if (try cmd_line.command_line(&line_buffer, reader, writer, .{})) |line| blk: {
         try writer.print("\n", .{});
         break :blk if (try cmd_line.line_parse(
-            RunCommand,
+            RunInput,
             line,
             writer,
-        )) |cmd_input|
-            .{ .cmd = cmd_input }
+        )) |run_input|
+            run_input
         else if (try cmd_line.line_parse(
             ctl.CtlInput,
             line,

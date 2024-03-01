@@ -377,12 +377,12 @@ pub fn line_parse(
                 switch (@typeInfo(f.type)) {
                     .Void,
                     .Enum,
+                    .Union,
                     => {
                         // Implemented!
                     },
                     .Bool,
                     .Int,
-                    .Union,
                     => {
                         // To be implemented in the future!
                         @compileError("field " ++ f.name ++
@@ -481,9 +481,9 @@ fn arg_parse(
                 break @enumFromInt(f.value);
             }
         } else null,
+        .Union => |info| line_parse_union(T, info, line, writer),
         .Bool,
         .Int,
-        .Union,
         => @compileError("unreachable"),
         else => @compileError("unreachable"),
     };
