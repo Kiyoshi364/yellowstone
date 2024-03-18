@@ -175,8 +175,11 @@ fn command_not_implemented(
     std.os.exit(1);
 }
 
+const RepeatCtlInput = struct { times: u8, ctl: ctl.CtlInput };
+
 const RunInput = union(enum) {
     ctl: ctl.CtlInput,
+    repeat: RepeatCtlInput,
     q,
     quit,
 };
@@ -277,6 +280,14 @@ fn run(
         switch (input) {
             .ctl => |ctlinput| {
                 try step_controler(&ctlstates[0], ctlinput, alloc);
+                try ctl.draw(ctlstates[0], alloc, stdout);
+                try bwout.flush();
+            },
+            .repeat => |rep| {
+                for (0..rep.times) |_| {
+                    try step_controler(&ctlstates[0], rep.ctl, alloc);
+                    try check_serde(ctlstates[0].sim_state, ctlstates[1].sim_state.grid, alloc);
+                }
                 try ctl.draw(ctlstates[0], alloc, stdout);
                 try bwout.flush();
             },
