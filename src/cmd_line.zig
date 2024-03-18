@@ -367,12 +367,13 @@ pub fn command_line(
 
 pub fn line_parse(
     comptime T: type,
-    line: []const u8,
+    line: *[]const u8,
     writer: anytype,
 ) !?T {
-    return switch (@typeInfo(T)) {
+    const line_backup = line.*;
+    const ret = try switch (@typeInfo(T)) {
         .Enum => |info| line_parse_enum(T, info, line, writer),
-        .Union => |info| blk2: {
+        .Union => |info| blk: {
             inline for (info.fields) |f| {
                 switch (@typeInfo(f.type)) {
                     .Void,
@@ -408,21 +409,26 @@ pub fn line_parse(
                     },
                 }
             }
-            break :blk2 line_parse_union(T, info, line, writer);
+            break :blk line_parse_union(T, info, line, writer);
         },
         else => @compileError("expected " ++ @typeName(T) ++ " to be a Union"),
     };
+    if (ret) |_| {
+        try warn_ignoring_prompt(line.*, writer);
+    } else {
+        line.* = line_backup;
+    }
+    return ret;
 }
 
-pub fn line_parse_enum(
+fn line_parse_enum(
     comptime T: type,
     comptime info: Type.Enum,
-    line: []const u8,
-    writer: anytype,
+    line: *[]const u8,
 ) !?T {
     return inline for (info.fields) |f| {
-        if (prefix(line, f.name)) |i| {
-            try warn_ignoring_prompt(line[i..], writer);
+        if (prefix(line.*, f.name)) |i| {
+            line.* = line.*[i..];
             break @enumFromInt(f.value);
         } else {
             // Nothing
@@ -430,22 +436,22 @@ pub fn line_parse_enum(
     } else null;
 }
 
-pub fn line_parse_union(
+fn line_parse_union(
     comptime T: type,
     comptime info: Type.Union,
-    line: []const u8,
+    line: *[]const u8,
     writer: anytype,
 ) !?T {
     return inline for (info.fields) |f| {
-        if (prefix(line, f.name)) |i| {
-            break if (try arg_parse(f.type, line[i..], writer)) |arg|
+        if (prefix(line.*, f.name)) |i| {
+            line.* = line.*[i..];
+            break if (try arg_parse(f.type, line, writer)) |arg|
                 @unionInit(T, f.name, arg)
             else blk: {
                 try writer.print(
                     "Command {s}: missing argument\n",
                     .{f.name},
                 );
-                try warn_ignoring_prompt(line[i..], writer);
                 break :blk null;
             };
         } else {
@@ -465,19 +471,18 @@ fn warn_ignoring_prompt(line: []const u8, writer: anytype) !void {
 
 fn arg_parse(
     comptime T: type,
-    line: []const u8,
+    line: *[]const u8,
     writer: anytype,
 ) !?T {
     return switch (@typeInfo(T)) {
-        .Void => try warn_ignoring_prompt(line, writer),
+        .Void => {},
         .Struct => |info| blk: {
-            std.debug.assert(info.fields.len == 0);
-            try warn_ignoring_prompt(line, writer);
+            comptime std.debug.assert(info.fields.len == 0);
             break :blk .{};
         },
         .Enum => |info| inline for (info.fields) |f| {
-            if (prefix(line, f.name)) |i| {
-                try warn_ignoring_prompt(line[i..], writer);
+            if (prefix(line.*, f.name)) |i| {
+                line.* = line.*[i..];
                 break @enumFromInt(f.value);
             }
         } else null,

@@ -355,15 +355,16 @@ fn command_line(reader: anytype, writer: anytype) !?RunInput {
     var line_buffer = @as([64]u8, undefined);
     return if (try cmd_line.command_line(&line_buffer, reader, writer, .{})) |line| blk: {
         try writer.print("\n", .{});
+        var line_2 = line;
         break :blk if (try cmd_line.line_parse(
             RunInput,
-            line,
+            &line_2,
             writer,
         )) |run_input|
             run_input
         else if (try cmd_line.line_parse(
             ctl.CtlInput,
-            line,
+            &line_2,
             writer,
         )) |ctl_input|
             .{ .ctl = ctl_input }
