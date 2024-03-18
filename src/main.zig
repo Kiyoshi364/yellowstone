@@ -356,26 +356,44 @@ fn command_line(reader: anytype, writer: anytype) !?RunInput {
     return if (try cmd_line.command_line(&line_buffer, reader, writer, .{})) |line| blk: {
         try writer.print("\n", .{});
         var line_2 = line;
-        break :blk if (try cmd_line.line_parse(
+        break :blk switch (try cmd_line.line_parse(
             RunInput,
             &line_2,
             writer,
-        )) |run_input|
-            run_input
-        else if (try cmd_line.line_parse(
-            ctl.CtlInput,
-            &line_2,
-            writer,
-        )) |ctl_input|
-            .{ .ctl = ctl_input }
-        else blk2: {
-            try writer.print(
-                "Unrecognized or incomplete command :{s}§\n",
-                .{line},
-            );
-            break :blk2 null;
+        )) {
+            .MissingArgument => |name| reportMissingArgument(
+                name,
+                writer,
+            ),
+            .Ok => |run_input| run_input,
+            .NoMatch => switch (try cmd_line.line_parse(
+                ctl.CtlInput,
+                &line_2,
+                writer,
+            )) {
+                .MissingArgument => |name| reportMissingArgument(
+                    name,
+                    writer,
+                ),
+                .Ok => |ctl_input| .{ .ctl = ctl_input },
+                .NoMatch => blk2: {
+                    try writer.print(
+                        "Unrecognized or incomplete command :{s}§\n",
+                        .{line},
+                    );
+                    break :blk2 null;
+                },
+            },
         };
     } else null;
+}
+
+fn reportMissingArgument(name: []const u8, writer: anytype) !?RunInput {
+    try writer.print(
+        "Command {s}: missing argument\n",
+        .{name},
+    );
+    return null;
 }
 
 extern "kernel32" fn SetConsoleMode(
