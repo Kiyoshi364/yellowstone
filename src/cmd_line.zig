@@ -387,29 +387,19 @@ pub fn line_parse(
                     .Void,
                     .Enum,
                     .Union,
+                    .Struct,
+                    .Int,
                     => {
                         // Implemented!
                     },
-                    .Bool,
-                    .Int,
-                    => {
+                    .Bool => {
                         // To be implemented in the future!
                         @compileError("field " ++ f.name ++
                             " with type " ++ @typeName(f.type) ++
                             " inside type " ++ @typeName(T) ++
                             " is not supported (maybe in the future)");
                     },
-                    .Struct => |fi| {
-                        // Special case
-                        if (fi.fields.len > 0) {
-                            @compileError("field " ++ f.name ++
-                                " with type " ++ @typeName(f.type) ++
-                                " inside type " ++ @typeName(T) ++
-                                " is not supported. Structs must have no fields");
-                        }
-                    },
                     else => {
-                        // To be implemented in the future!
                         @compileError("field " ++ f.name ++
                             " with type " ++ @typeName(f.type) ++
                             " inside type " ++ @typeName(T) ++
@@ -467,6 +457,55 @@ fn line_parse_union(
     } else .NoMatch;
 }
 
+fn line_parse_struct(
+    comptime T: type,
+    comptime info: Type.Struct,
+    line: *[]const u8,
+) !LineParse(T) {
+    var struct_ = @as(T, undefined);
+    return inline for (info.fields) |f| {
+        switch (try arg_parse(f.type, line)) {
+            .Ok => |arg| @field(struct_, f.name) = arg,
+            .MissingArgument => |name| break .{
+                .MissingArgument = name,
+            },
+            .NoMatch => break .{
+                .MissingArgument = f.name,
+            },
+        }
+    } else .{ .Ok = struct_ };
+}
+
+fn line_parse_int(
+    comptime T: type,
+    comptime info: Type.Int,
+    line: *[]const u8,
+) !LineParse(T) {
+    comptime std.debug.assert(info.signedness == .unsigned);
+    var i = @as(usize, 0);
+    while (i < line.len and
+        '0' <= line.*[i] and
+        line.*[i] <= '9') : (i += 1)
+    {}
+    if (line.len == i or line.*[i] == ' ') {
+        const num = parseInt(T, 10, line.*[0..i]);
+        line.* = line.*[i..];
+        eat_space(line);
+        return if (i <= 0)
+            .NoMatch
+        else if (i == line.len)
+            .{ .Ok = num }
+        else blk: {
+            if (line.*[0] == ' ') {
+                line.* = line.*[1..];
+            }
+            break :blk .{ .Ok = num };
+        };
+    } else {
+        return .NoMatch;
+    }
+}
+
 fn warn_ignoring_prompt(line: []const u8, writer: anytype) !void {
     if (line.len > 0) {
         try writer.print(
@@ -482,15 +521,11 @@ fn arg_parse(
 ) !LineParse(T) {
     return switch (@typeInfo(T)) {
         .Void => .{ .Ok = {} },
-        .Struct => |info| blk: {
-            comptime std.debug.assert(info.fields.len == 0);
-            break :blk .{ .Ok = .{} };
-        },
+        .Struct => |info| line_parse_struct(T, info, line),
         .Enum => |info| line_parse_enum(T, info, line),
         .Union => |info| line_parse_union(T, info, line),
-        .Bool,
-        .Int,
-        => @compileError("unreachable"),
+        .Int => |info| line_parse_int(T, info, line),
+        .Bool => @compileError("unreachable"),
         else => @compileError("unreachable"),
     };
 }
@@ -508,4 +543,22 @@ fn prefix(big: []const u8, small: []const u8) ?usize {
         small.len + 1
     else
         null;
+}
+
+fn parseInt(
+    comptime Int: type,
+    comptime base: comptime_int,
+    str: []const u8,
+) Int {
+    comptime std.debug.assert(0 < base);
+    var num = @as(Int, 0);
+    for (str) |d| {
+        std.debug.assert('0' <= d and d <= '9');
+        const val = @as(Int, switch (d) {
+            '0'...'9' => d - '0',
+            else => unreachable,
+        });
+        num = num * base + val;
+    }
+    return num;
 }
