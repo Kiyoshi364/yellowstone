@@ -379,6 +379,7 @@ pub fn line_parse(
     writer: anytype,
 ) !LineParse(T) {
     const line_backup = line.*;
+    eat_space(line);
     const ret = try switch (@typeInfo(T)) {
         .Enum => |info| line_parse_enum(T, info, line),
         .Union => |info| blk: {
@@ -414,7 +415,7 @@ pub fn line_parse(
     switch (ret) {
         .NoMatch => line.* = line_backup,
         .MissingArgument => {},
-        .Ok => try warn_ignoring_prompt(line.*, writer),
+        .Ok => try warn_ignoring_prompt(line, writer),
     }
     return ret;
 }
@@ -442,6 +443,7 @@ fn line_parse_union(
     return inline for (info.fields) |f| {
         if (prefix(line.*, f.name)) |i| {
             line.* = line.*[i..];
+            eat_space(line);
             break switch (try arg_parse(f.type, line)) {
                 .NoMatch => .{ .MissingArgument = f.name },
                 .MissingArgument => |name| .{
@@ -473,6 +475,7 @@ fn line_parse_struct(
                 .MissingArgument = f.name,
             },
         }
+        eat_space(line);
     } else .{ .Ok = struct_ };
 }
 
@@ -506,11 +509,12 @@ fn line_parse_int(
     }
 }
 
-fn warn_ignoring_prompt(line: []const u8, writer: anytype) !void {
+fn warn_ignoring_prompt(line: *[]const u8, writer: anytype) !void {
+    eat_space(line);
     if (line.len > 0) {
         try writer.print(
             "WARNING: ignoring end of prompt: \"{s}\"\n",
-            .{line},
+            .{line.*},
         );
     }
 }
@@ -528,6 +532,10 @@ fn arg_parse(
         .Bool => @compileError("unreachable"),
         else => @compileError("unreachable"),
     };
+}
+
+fn eat_space(line: *[]const u8) void {
+    while (0 < line.len and line.*[0] == ' ') : (line.* = line.*[1..]) {}
 }
 
 fn prefix(big: []const u8, small: []const u8) ?usize {
