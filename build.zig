@@ -60,7 +60,7 @@ pub fn build(b: *std.Build) void {
 
     const main_docs = b.addInstallDirectory(.{
         .source_dir = dummy_tests_main.getEmittedDocs(),
-        .install_dir = .{ .custom = ".." },
+        .install_dir = .prefix,
         .install_subdir = "docs",
     });
 
