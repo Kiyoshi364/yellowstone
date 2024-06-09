@@ -357,13 +357,16 @@ or might not with some reasoning behind.
 They are subdivided in:
 * Simulation: new features, blocks, interactions, ...;
   stuff related to the simulation itself.
-* Environment: "stack blocks", record/replay, run on smartphone, ...;
+* Environment: "stack blocks", record/replay, input remapping, ...;
   user interaction outside of simulation itself.
 * Implementation: runs faster, less memory, more efficient, ...;
   changes here should not consern "normal users" besides
   performance (speed/memory) reasons.
+* Platform: run on smartphone, support ansi escape codes, ...;
+  steps towards separating "engine code" and "simulation code"
+  (then improving platform implementations).
 
-> _Note:_ for now the sections are empty.
+> _Note:_ for now some sections are empty.
 > There should be an explanation in the future.
 
 ---
@@ -405,16 +408,9 @@ from/to a file. Good things:
 * a step towards record/replay
   * write tests
 
-### Support to Other Plataforms
+> _Note:_
+> There is a text format, but no documentation of it
 
-Because the simulation is a separate thing,
-it could be "easily" ported to other plataforms, like:
-* Window/Graphics stuff (GUI)
-* [Wasm4](https://wasm4.org)
-* Smartphones
-* ...
-
----
 ### Config/(Re)map file format
 
 Have a config file to (re)map buttons
@@ -426,3 +422,22 @@ Have a config file to (re)map buttons
 ### Event List hold unique positions
 ### Events to Empty block are not stored
 ### Cache machines' positions
+
+---
+## Platform
+
+### Formalize a Platform Interface
+
+This is a first step into separating
+"engine code" and "simulation code".
+The code this far is
+
+With a separate platform,
+it could be "easily" ported to other computer environments, like:
+* Window/Graphics stuff (GUI)
+* [Wasm4](https://wasm4.org)
+* Smartphones
+* ...
+
+With a separate platform,
+we could have hotreloading.
