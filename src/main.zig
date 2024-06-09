@@ -55,7 +55,7 @@ fn deserialize(
 }
 
 const default_state = struct {
-    grid: []sim.block.Block,
+    grid: [grid_len]sim.block.Block,
     bounds: sim.State.Pos,
 
     const grid_len = 2 * 8 * 16;
@@ -72,7 +72,7 @@ const default_state = struct {
         var data = @as([grid_len]sim.DrawInfo, undefined);
 
         const CR_incr = 6 * (2 + (header.bounds[0] - 1) + (header.bounds[0] * header.bounds[1]));
-        @setEvalBranchQuota(0x192C + CR_incr);
+        @setEvalBranchQuota(0x1F6B + CR_incr);
         const deser = lib_deser.deserialize_alloced(
             sim.DrawInfo,
             header,
@@ -83,7 +83,7 @@ const default_state = struct {
         sim.unrender_grid(deser.data, &grid);
 
         break :blk @This(){
-            .grid = &grid,
+            .grid = grid,
             .bounds = header.bounds,
         };
     };
@@ -145,7 +145,7 @@ pub fn main() !void {
             &argsIter,
             stderr_file,
         ) orelse {
-            std.os.exit(1);
+            std.posix.exit(1);
         };
     };
 
@@ -172,7 +172,7 @@ fn command_not_implemented(
         "command not implemented: {s}\n",
         .{@tagName(@as(argsParser.CommandEnum, cmd))},
     ) catch {};
-    std.os.exit(1);
+    std.posix.exit(1);
 }
 
 const RepeatCtlInput = struct { times: u8, ctl: ctl.CtlInput };
@@ -247,7 +247,7 @@ fn run(
 
         for (0..ctlstates.len) |i| {
             const grid = grids[i * grid_len .. (i + 1) * grid_len];
-            std.mem.copy(sim.block.Block, grid, default_state.grid);
+            std.mem.copyForwards(sim.block.Block, grid, &default_state.grid);
             const state = .{
                 .grid = grid,
                 .bounds = default_state.bounds,
@@ -533,17 +533,18 @@ const LinuxTerm = struct {
     // https://blog.nelhage.com/2009/12/a-brief-introduction-to-termios-termios3-and-stty/
     // Reference:
     // man 3 termios   # Look for c_lflag, (non-)canonical mode and raw mode
-    old_term: ?std.os.termios,
+    old_term: ?std.posix.termios,
 
     fn config_term() !LinuxTerm {
         const fd = 0;
-        const old_term = std.os.tcgetattr(fd) catch |err| switch (err) {
+        const old_term = std.posix.tcgetattr(fd) catch |err| switch (err) {
             error.NotATerminal => return .{ .old_term = null },
             error.Unexpected => return err,
         };
         var new_term = old_term;
-        new_term.lflag &= ~(std.os.linux.ICANON | std.os.linux.ECHO);
-        try std.os.tcsetattr(fd, .NOW, new_term);
+        new_term.lflag.ICANON = false;
+        new_term.lflag.ECHO = false;
+        try std.posix.tcsetattr(fd, .NOW, new_term);
         return .{
             .old_term = old_term,
         };
@@ -552,7 +553,7 @@ const LinuxTerm = struct {
     fn unconfig_term(self: LinuxTerm) !void {
         if (self.old_term) |old_term| {
             const fd = 0;
-            try std.os.tcsetattr(fd, .NOW, old_term);
+            try std.posix.tcsetattr(fd, .NOW, old_term);
         }
     }
 };

@@ -59,7 +59,7 @@ const commands_info = struct {
                     "'s implementation " ++ @typeName(T) ++
                     " does not have small_description");
             }
-            if (!std.meta.trait.isZigString(@TypeOf(@field(T, "small_description")))) {
+            if (!isZigString(@TypeOf(@field(T, "small_description")))) {
                 @compileError("Command " ++ tag.name ++
                     "'s implementation " ++ @typeName(T) ++
                     ".small_description must be a zig string" ++
@@ -236,4 +236,73 @@ fn bd_help(program: []const u8, error_writer: anytype) void {
             // Empty
         }
     }
+}
+
+// Copied from zig-0.11.0 std/meta/trait.zig
+pub fn isZigString(comptime T: type) bool {
+    return comptime blk: {
+        // Only pointer types can be strings, no optionals
+        const info = @typeInfo(T);
+        if (info != .Pointer) break :blk false;
+
+        const ptr = &info.Pointer;
+        // Check for CV qualifiers that would prevent coerction to []const u8
+        if (ptr.is_volatile or ptr.is_allowzero) break :blk false;
+
+        // If it's already a slice, simple check.
+        if (ptr.size == .Slice) {
+            break :blk ptr.child == u8;
+        }
+
+        // Otherwise check if it's an array type that coerces to slice.
+        if (ptr.size == .One) {
+            const child = @typeInfo(ptr.child);
+            if (child == .Array) {
+                const arr = &child.Array;
+                break :blk arr.child == u8;
+            }
+        }
+
+        break :blk false;
+    };
+}
+
+// Copied from zig-0.11.0 std/meta/trait.zig
+test "isZigString" {
+    const testing = std.testing;
+    try testing.expect(isZigString([]const u8));
+    try testing.expect(isZigString([]u8));
+    try testing.expect(isZigString([:0]const u8));
+    try testing.expect(isZigString([:0]u8));
+    try testing.expect(isZigString([:5]const u8));
+    try testing.expect(isZigString([:5]u8));
+    try testing.expect(isZigString(*const [0]u8));
+    try testing.expect(isZigString(*[0]u8));
+    try testing.expect(isZigString(*const [0:0]u8));
+    try testing.expect(isZigString(*[0:0]u8));
+    try testing.expect(isZigString(*const [0:5]u8));
+    try testing.expect(isZigString(*[0:5]u8));
+    try testing.expect(isZigString(*const [10]u8));
+    try testing.expect(isZigString(*[10]u8));
+    try testing.expect(isZigString(*const [10:0]u8));
+    try testing.expect(isZigString(*[10:0]u8));
+    try testing.expect(isZigString(*const [10:5]u8));
+    try testing.expect(isZigString(*[10:5]u8));
+
+    try testing.expect(!isZigString(u8));
+    try testing.expect(!isZigString([4]u8));
+    try testing.expect(!isZigString([4:0]u8));
+    try testing.expect(!isZigString([*]const u8));
+    try testing.expect(!isZigString([*]const [4]u8));
+    try testing.expect(!isZigString([*c]const u8));
+    try testing.expect(!isZigString([*c]const [4]u8));
+    try testing.expect(!isZigString([*:0]const u8));
+    try testing.expect(!isZigString([*:0]const u8));
+    try testing.expect(!isZigString(*[]const u8));
+    try testing.expect(!isZigString(?[]const u8));
+    try testing.expect(!isZigString(?*const [4]u8));
+    try testing.expect(!isZigString([]allowzero u8));
+    try testing.expect(!isZigString([]volatile u8));
+    try testing.expect(!isZigString(*allowzero [4]u8));
+    try testing.expect(!isZigString(*volatile [4]u8));
 }

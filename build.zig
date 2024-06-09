@@ -14,16 +14,16 @@ pub fn build(b: *std.Build) void {
 
     // Create (de)serialization Module
     const deser_module = b.createModule(.{
-        .source_file = .{ .path = "deserializer/serializer.zig" },
+        .root_source_file = b.path("deserializer/serializer.zig"),
     });
 
     const exe = b.addExecutable(.{
         .name = "yellowstone",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    exe.addModule("lib_deser", deser_module);
+    exe.root_module.addImport("lib_deser", deser_module);
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
@@ -41,22 +41,22 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 
     const exe_tests_main = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    exe_tests_main.addModule("lib_deser", deser_module);
+    exe_tests_main.root_module.addImport("lib_deser", deser_module);
 
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&b.addRunArtifact(exe_tests_main).step);
 
     // Creates a step for docs.
     const dummy_tests_main = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
-    dummy_tests_main.addModule("lib_deser", deser_module);
+    dummy_tests_main.root_module.addImport("lib_deser", deser_module);
 
     const main_docs = b.addInstallDirectory(.{
         .source_dir = dummy_tests_main.getEmittedDocs(),
