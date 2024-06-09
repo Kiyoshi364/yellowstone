@@ -35,7 +35,7 @@ Note that zig is not released yet.
 This project is being developed with the following `zig version`:
 ```console
 $ zig version
-0.12.1
+0.13.0
 ```
 
 See: ([downloads page](https:ziglang.org/download))
