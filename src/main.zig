@@ -180,8 +180,12 @@ const RepeatCtlInput = struct { times: u8, ctl: ctl.CtlInput };
 const RunInput = union(enum) {
     ctl: ctl.CtlInput,
     repeat: RepeatCtlInput,
+    h,
+    help,
     q,
     quit,
+    command,
+    noop,
 };
 
 fn run(
@@ -272,10 +276,14 @@ fn run(
     try bwout.flush();
 
     while (true) {
-        const input =
-            try read_command(&stdin_file, &stdout_file) orelse {
-            break;
-        };
+        var input =
+            try read_command(default_keymap, &stdin_file);
+
+        while (input == .command) {
+            input =
+                try command_line(&stdin_file, &stdout_file) orelse
+                .noop;
+        }
 
         switch (input) {
             .ctl => |ctlinput| {
@@ -291,7 +299,12 @@ fn run(
                 try ctl.draw(ctlstates[0], alloc, stdout);
                 try bwout.flush();
             },
+            .h, .help => {
+                try print_keymaps(default_keymap, &stdout_file);
+            },
             .q, .quit => break,
+            .command => unreachable,
+            .noop => {},
         }
 
         try check_serde(ctlstates[0].sim_state, ctlstates[1].sim_state.grid, alloc);
@@ -310,55 +323,94 @@ fn run(
     }
 }
 
-fn read_command(reader: anytype, writer: anytype) !?RunInput {
-    var buffer = @as([1]u8, undefined);
-    return while (true) {
-        const size = try reader.read(&buffer);
-        if (size == 0) {
-            break null;
-        }
-        switch (buffer[0]) {
-            ' ' => break .{ .ctl = .{ .step = .{} } },
-            '\r', '\n' => break .{ .ctl = .{ .putBlock = .{} } },
-            'w' => break .{ .ctl = .{ .moveCursor = .Up } },
-            's' => break .{ .ctl = .{ .moveCursor = .Down } },
-            'a' => break .{ .ctl = .{ .moveCursor = .Left } },
-            'd' => break .{ .ctl = .{ .moveCursor = .Right } },
-            'z' => break .{ .ctl = .{ .moveCursor = .Above } },
-            'x' => break .{ .ctl = .{ .moveCursor = .Below } },
-            'h' => break .{ .ctl = .{ .moveCamera = .Left } },
-            'j' => break .{ .ctl = .{ .moveCamera = .Down } },
-            'k' => break .{ .ctl = .{ .moveCamera = .Up } },
-            'l' => break .{ .ctl = .{ .moveCamera = .Right } },
-            'u' => break .{ .ctl = .{ .moveCamera = .Above } },
-            'i' => break .{ .ctl = .{ .moveCamera = .Below } },
-            'H' => break .{ .ctl = .{ .retractCamera = .Right } },
-            'J' => break .{ .ctl = .{ .expandCamera = .Down } },
-            'K' => break .{ .ctl = .{ .retractCamera = .Down } },
-            'L' => break .{ .ctl = .{ .expandCamera = .Right } },
-            'U' => break .{ .ctl = .{ .expandCamera = .Above } },
-            'I' => break .{ .ctl = .{ .retractCamera = .Above } },
-            'f' => break .{ .ctl = .{ .flipCamera = .x } },
-            'F' => break .{ .ctl = .{ .flipCamera = .y } },
-            'g' => break .{ .ctl = .{ .flipCamera = .z } },
-            'c' => break .{ .ctl = .{ .swapDimCamera = .z } },
-            'v' => break .{ .ctl = .{ .swapDimCamera = .y } },
-            'b' => break .{ .ctl = .{ .swapDimCamera = .x } },
-            'n' => break .{ .ctl = .{ .nextBlock = .{} } },
-            'p' => break .{ .ctl = .{ .prevBlock = .{} } },
-            '.' => break .{ .ctl = .{ .nextRotate = .{} } },
-            ',' => break .{ .ctl = .{ .prevRotate = .{} } },
-            ':' => if (try command_line(reader, writer)) |input|
-                break input
-            else {},
-            'q' => break null,
+const Keymap = [256]RunInput;
+const default_keymap: Keymap = blk: {
+    var map = @as(Keymap, undefined);
+    for (&map, 0..) |*input, key| {
+        switch (key) {
+            ' ' => input.* = .{ .ctl = .{ .step = .{} } },
+            '\r', '\n' => input.* = .{ .ctl = .{ .putBlock = .{} } },
+            'w' => input.* = .{ .ctl = .{ .moveCursor = .Up } },
+            's' => input.* = .{ .ctl = .{ .moveCursor = .Down } },
+            'a' => input.* = .{ .ctl = .{ .moveCursor = .Left } },
+            'd' => input.* = .{ .ctl = .{ .moveCursor = .Right } },
+            'z' => input.* = .{ .ctl = .{ .moveCursor = .Above } },
+            'x' => input.* = .{ .ctl = .{ .moveCursor = .Below } },
+            'h' => input.* = .{ .ctl = .{ .moveCamera = .Left } },
+            'j' => input.* = .{ .ctl = .{ .moveCamera = .Down } },
+            'k' => input.* = .{ .ctl = .{ .moveCamera = .Up } },
+            'l' => input.* = .{ .ctl = .{ .moveCamera = .Right } },
+            'u' => input.* = .{ .ctl = .{ .moveCamera = .Above } },
+            'i' => input.* = .{ .ctl = .{ .moveCamera = .Below } },
+            'H' => input.* = .{ .ctl = .{ .retractCamera = .Right } },
+            'J' => input.* = .{ .ctl = .{ .expandCamera = .Down } },
+            'K' => input.* = .{ .ctl = .{ .retractCamera = .Down } },
+            'L' => input.* = .{ .ctl = .{ .expandCamera = .Right } },
+            'U' => input.* = .{ .ctl = .{ .expandCamera = .Above } },
+            'I' => input.* = .{ .ctl = .{ .retractCamera = .Above } },
+            'f' => input.* = .{ .ctl = .{ .flipCamera = .x } },
+            'F' => input.* = .{ .ctl = .{ .flipCamera = .y } },
+            'g' => input.* = .{ .ctl = .{ .flipCamera = .z } },
+            'c' => input.* = .{ .ctl = .{ .swapDimCamera = .z } },
+            'v' => input.* = .{ .ctl = .{ .swapDimCamera = .y } },
+            'b' => input.* = .{ .ctl = .{ .swapDimCamera = .x } },
+            'n' => input.* = .{ .ctl = .{ .nextBlock = .{} } },
+            'p' => input.* = .{ .ctl = .{ .prevBlock = .{} } },
+            '.' => input.* = .{ .ctl = .{ .nextRotate = .{} } },
+            ',' => input.* = .{ .ctl = .{ .prevRotate = .{} } },
+            '?' => input.* = .help,
+            ':' => input.* = .command,
+            'q' => input.* = .quit,
             // 0x03: Ctrl-C (End of Text)
             // 0x04: Ctrl-D (End of Transmition)
             // 0x17: Ctrl-W (End of Transmition Block)
             // 0x19: Ctrl-Y (End of Medium)
-            0x03, 0x04, 0x17, 0x19 => break null,
-            else => {},
+            0x03, 0x04, 0x17, 0x19 => input.* = .quit,
+            else => input.* = .noop,
         }
+    }
+    break :blk map;
+};
+
+fn print_keymaps(keymap: Keymap, writer: anytype) !void {
+    for (keymap, 0..) |input, key| {
+        if (input == .noop) {
+            continue;
+        }
+        if (key < 0x20 or key == 0x7F) {
+            try writer.print("'^{c}' => ", .{
+                @as(u8, @intCast(key ^ 0x40)),
+            });
+        } else {
+            try writer.print("'{c}' => ", .{
+                @as(u8, @intCast(key)),
+            });
+        }
+        switch (input) {
+            .ctl => |ctlinput| try writer.print(
+                "ctl {}\n",
+                .{ctlinput},
+            ),
+            .repeat => |rep| try writer.print(
+                "repeat {d} {}\n",
+                .{ rep.times, rep.ctl },
+            ),
+            .h, .help => try writer.print("help\n", .{}),
+            .q, .quit => try writer.print("quit\n", .{}),
+            .command => try writer.print("command\n", .{}),
+            .noop => unreachable,
+        }
+    }
+}
+
+fn read_command(keymap: Keymap, reader: anytype) !RunInput {
+    var buffer = @as([1]u8, undefined);
+    return while (true) {
+        const size = try reader.read(&buffer);
+        if (size == 0) {
+            break .quit;
+        }
+        break (keymap[buffer[0]]);
     } else unreachable;
 }
 
