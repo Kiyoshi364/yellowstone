@@ -138,6 +138,51 @@ pub const CtlInput = union(enum) {
     prevBlock: struct {},
     nextRotate: struct {},
     prevRotate: struct {},
+
+    pub fn format(
+        input: CtlInput,
+        comptime specifier: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        const fmt = std.fmt;
+        const info = @typeInfo(CtlInput).Union;
+        const TagType = info.tag_type.?;
+        if (comptime std.mem.eql(u8, specifier, "")) {
+            // Copied from std.fmt.formatType
+            try fmt.format(writer, "{s}{{ .{s} = ", .{
+                @typeName(CtlInput),
+                @tagName(@as(TagType, input)),
+            });
+            inline for (info.fields) |u_field| {
+                if (input == @field(TagType, u_field.name)) {
+                    try fmt.formatType(@field(input, u_field.name), "any", options, writer, std.options.fmt_max_depth - 1);
+                }
+            }
+            try writer.writeAll(" }");
+        } else if (comptime std.mem.eql(u8, specifier, "command")) {
+            try writer.writeAll(@tagName(@as(TagType, input)));
+            inline for (info.fields) |u_field| {
+                if (input == @field(TagType, u_field.name)) {
+                    const field_info = @typeInfo(u_field.type);
+                    if (field_info == .Struct and field_info.Struct.fields.len == 0) {
+                        // Skip empty structs
+                        return;
+                    } else {
+                        try writer.writeAll(" ");
+                    }
+                    const child = @field(input, u_field.name);
+                    if (std.meta.hasMethod(u_field.type, "format")) {
+                        try child.format("command", options, writer);
+                    } else {
+                        try fmt.formatType(child, "any", options, writer, std.options.fmt_max_depth - 1);
+                    }
+                }
+            }
+        } else {
+            fmt.invalidFmtError(specifier, input);
+        }
+    }
 };
 
 fn DirPosIter(comptime Int: type) type {

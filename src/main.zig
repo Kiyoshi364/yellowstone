@@ -388,11 +388,11 @@ fn print_keymaps(keymap: Keymap, writer: anytype) !void {
         }
         switch (input) {
             .ctl => |ctlinput| try writer.print(
-                "ctl {}\n",
+                "ctl {command}\n",
                 .{ctlinput},
             ),
             .repeat => |rep| try writer.print(
-                "repeat {d} {}\n",
+                "repeat {d} {command}\n",
                 .{ rep.times, rep.ctl },
             ),
             .h, .help => try writer.print("help\n", .{}),

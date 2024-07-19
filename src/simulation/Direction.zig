@@ -213,6 +213,35 @@ pub const DirectionEnum = enum(u3) {
         }
         return buffer[0..i];
     }
+
+    pub fn format(
+        de: DirectionEnum,
+        comptime specifier: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        const fmt = std.fmt;
+        const enumInfo = @typeInfo(DirectionEnum).Enum;
+        if (comptime std.mem.eql(u8, specifier, "")) {
+            // Copied from std.fmt.formatType
+            try writer.writeAll(@typeName(DirectionEnum));
+            // Use @tagName only if value is one of known fields
+            inline for (enumInfo.fields) |enumField| {
+                if (@intFromEnum(de) == enumField.value) {
+                    try writer.writeAll(".");
+                    try writer.writeAll(@tagName(de));
+                }
+            }
+        } else if (comptime std.mem.eql(u8, specifier, "command")) {
+            inline for (enumInfo.fields) |enumField| {
+                if (@intFromEnum(de) == enumField.value) {
+                    try fmt.formatBuf(@tagName(de), options, writer);
+                }
+            }
+        } else {
+            fmt.invalidFmtError(specifier, de);
+        }
+    }
 };
 
 pub const Axis = enum(u2) {
@@ -226,5 +255,34 @@ pub const Axis = enum(u2) {
             .y => if (is_pos) .Down else .Up,
             .x => if (is_pos) .Right else .Left,
         };
+    }
+
+    pub fn format(
+        axis: Axis,
+        comptime specifier: []const u8,
+        options: std.fmt.FormatOptions,
+        writer: anytype,
+    ) !void {
+        const fmt = std.fmt;
+        const enumInfo = @typeInfo(Axis).Enum;
+        if (comptime std.mem.eql(u8, specifier, "")) {
+            // Copied from std.fmt.formatType
+            try writer.writeAll(@typeName(Axis));
+            // Use @tagName only if value is one of known fields
+            inline for (enumInfo.fields) |enumField| {
+                if (@intFromEnum(axis) == enumField.value) {
+                    try writer.writeAll(".");
+                    try writer.writeAll(@tagName(axis));
+                }
+            }
+        } else if (comptime std.mem.eql(u8, specifier, "command")) {
+            inline for (enumInfo.fields) |enumField| {
+                if (@intFromEnum(axis) == enumField.value) {
+                    try fmt.formatBuf(@tagName(axis), options, writer);
+                }
+            }
+        } else {
+            fmt.invalidFmtError(specifier, axis);
+        }
     }
 };
