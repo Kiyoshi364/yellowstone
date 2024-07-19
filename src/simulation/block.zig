@@ -105,30 +105,76 @@ pub const Block = union(BlockType) {
 
     pub fn format(
         block: Block,
-        _: []const u8,
-        _: std.fmt.FormatOptions,
+        comptime specifier: []const u8,
+        options: std.fmt.FormatOptions,
         writer: anytype,
     ) !void {
-        const fmt = std.fmt.format;
-        return switch (block) {
-            .empty => fmt(writer, " ", .{}),
-            .source => fmt(writer, "S", .{}),
-            .wire => fmt(writer, "w", .{}),
-            .block => fmt(writer, "B", .{}),
-            .led => fmt(writer, "L", .{}),
-            .repeater => |r| fmt(writer, "r{c}{c}{c}", .{
-                "1234"[@intFromEnum(r.get_delay())],
-                "o^>v<x"[@intFromEnum(r.facing)],
-                "0123456789abcdef"[r.get_memory()],
-            }),
-            .comparator => |c| fmt(writer, "c{c}{c}", .{
-                "o^>v<x"[@intFromEnum(c.facing)],
-                "0123456789abcdef"[c.memory],
-            }),
-            .negator => |n| fmt(writer, "n{c}{c}", .{
-                "o^>v<x"[@intFromEnum(n.facing)],
-                "01"[n.memory],
-            }),
-        };
+        const fmt = std.fmt;
+        var buffer = @as([21]u8, undefined);
+        var fbs = std.io.fixedBufferStream(&buffer);
+        const bufwriter = fbs.writer();
+        if (comptime std.mem.eql(u8, specifier, "")) {
+            try switch (block) {
+                .empty => fmt.format(bufwriter, "{letter}", .{block}),
+                .source => fmt.format(bufwriter, "{letter}", .{block}),
+                .wire => fmt.format(bufwriter, "{letter}", .{block}),
+                .block => fmt.format(bufwriter, "{letter}", .{block}),
+                .led => fmt.format(bufwriter, "{letter}", .{block}),
+                .repeater => |r| fmt.format(bufwriter, "{letter}{c}{c}{c}", .{
+                    block,
+                    "1234"[@intFromEnum(r.get_delay())],
+                    "o^>v<x"[@intFromEnum(r.facing)],
+                    "0123456789abcdef"[r.get_memory()],
+                }),
+                .comparator => |c| fmt.format(bufwriter, "{letter}{c}{c}", .{
+                    block,
+                    "o^>v<x"[@intFromEnum(c.facing)],
+                    "0123456789abcdef"[c.memory],
+                }),
+                .negator => |n| fmt.format(bufwriter, "{letter}{c}{c}", .{
+                    block,
+                    "o^>v<x"[@intFromEnum(n.facing)],
+                    "01"[n.memory],
+                }),
+            };
+        } else if (comptime std.mem.eql(u8, specifier, "letter")) {
+            try switch (block) {
+                .empty => bufwriter.writeAll(" "),
+                .source => bufwriter.writeAll("S"),
+                .wire => bufwriter.writeAll("w"),
+                .block => bufwriter.writeAll("B"),
+                .led => bufwriter.writeAll("L"),
+                .repeater => |_| bufwriter.writeAll("r"),
+                .comparator => |_| bufwriter.writeAll("c"),
+                .negator => |_| bufwriter.writeAll("n"),
+            };
+        } else if (comptime std.mem.eql(u8, specifier, "full")) {
+            try switch (block) {
+                .empty => fmt.format(bufwriter, "({letter}) Empty", .{block}),
+                .source => fmt.format(bufwriter, "({letter}) Source", .{block}),
+                .wire => fmt.format(bufwriter, "({letter}) wire", .{block}),
+                .block => fmt.format(bufwriter, "({letter}) Block", .{block}),
+                .led => fmt.format(bufwriter, "({letter}) LED", .{block}),
+                .repeater => |r| fmt.format(bufwriter, "({}) Repeater {c} {c} {c}", .{
+                    block,
+                    "1234"[@intFromEnum(r.get_delay())],
+                    "o^>v<x"[@intFromEnum(r.facing)],
+                    "0123456789abcdef"[r.get_memory()],
+                }),
+                .comparator => |c| fmt.format(bufwriter, "({}) Comparator {c} {c}", .{
+                    block,
+                    "o^>v<x"[@intFromEnum(c.facing)],
+                    "0123456789abcdef"[c.memory],
+                }),
+                .negator => |n| fmt.format(bufwriter, "({}) Negator {c} {c}", .{
+                    block,
+                    "o^>v<x"[@intFromEnum(n.facing)],
+                    "01"[n.memory],
+                }),
+            };
+        } else {
+            fmt.invalidFmtError(specifier, block);
+        }
+        return fmt.formatBuf(fbs.getWritten(), options, writer);
     }
 };

@@ -569,7 +569,7 @@ pub fn draw(
         ctl.block_state[ctl.curr_block],
     );
     try writer.print(
-        "= curr_block ({d}): {}\n",
+        "= curr_block ({d}): {full}\n",
         .{ ctl.curr_block, curr_block_state },
     );
 
